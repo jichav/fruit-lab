@@ -1,0 +1,2194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Fruit Lab: a personal sandbox by Václav Jícha. Put real-size fruit on a table, preview and slice it, measure every piece, cut exact fractions or swipe flying fruit.">
+<meta name="author" content="Václav Jícha">
+<meta name="theme-color" content="#eeece6">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23ec8312'/%3E%3Ccircle cx='16' cy='16' r='10.5' fill='%23f1ddb4'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%23f39a24'/%3E%3Cg stroke='%23f1ddb4' stroke-width='1.2'%3E%3Cpath d='M16 7v18M7 16h18M9.6 9.6l12.8 12.8M22.4 9.6 9.6 22.4'/%3E%3C/g%3E%3C/svg%3E">
+<title>Fruit Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..900,0..100,0..1;1,9..144,300..900,0..100,0..1&family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap">
+<style>
+/* Layout: full-bleed kitchen table (WebGL). Masthead top-left, mode tabs + pantry panel top-right,
+   field notes / goal card bottom-left, credit bottom-right, game overlays centred.
+   Single light look by choice (paper table). Display face: Fraunces soft + wonky; UI: Bricolage Grotesque. */
+:root {
+  color-scheme: light;
+  --paper: #eeece6;
+  --paper-hi: #fbfaf7;
+  --paper-lo: #dcd9d0;
+  --ink: #23201c;
+  --ink-2: #6f695f;
+  --rule: #d8d3c8;
+  --zest: #e86a10;
+  --leaf: #4f8a2a;
+  --panel: rgba(251, 250, 247, 0.88);
+  --f-display: "Fraunces", "Cooper Black", Georgia, serif;
+  --f-body: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --r: 12px;
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--paper); color: var(--ink); font-family: var(--f-body); overflow: hidden; }
+#app {
+  position: relative; height: 100%; overflow: hidden; user-select: none; -webkit-user-select: none;
+  background: radial-gradient(120% 90% at 55% 45%, var(--paper-hi) 0%, var(--paper) 55%, var(--paper-lo) 100%);
+}
+#gl, #ink { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#gl { touch-action: none; cursor: crosshair; }
+#gl.hand { cursor: grab; }
+#gl.hand.grabbing { cursor: grabbing; }
+#ink, #labels { pointer-events: none; }
+#labels { position: absolute; inset: 0; overflow: hidden; }
+
+.display { font-family: var(--f-display); font-variation-settings: "SOFT" 100, "WONK" 1; }
+.label { font: 600 11px/1.2 var(--f-body); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+
+.masthead {
+  position: absolute; pointer-events: none;
+  top: max(20px, env(safe-area-inset-top, 0px)); left: max(24px, env(safe-area-inset-left, 0px));
+  display: grid; gap: 10px; max-width: min(46vw, 560px);
+}
+.masthead h1 { margin: 0; font-weight: 640; font-size: clamp(38px, 5.6vw, 72px); line-height: .92; letter-spacing: -.02em; text-wrap: balance; }
+.masthead h1 span { display: block; padding-left: .5em; font-style: italic; font-weight: 500; color: var(--zest); }
+.masthead p { margin: 2px 0 0; font-size: 14px; line-height: 1.45; color: var(--ink-2); max-width: 36ch; }
+
+button {
+  font: 600 13px/1 var(--f-body); color: var(--ink); background: var(--paper-hi);
+  border: 1.5px solid var(--rule); border-radius: 10px; padding: 9px 11px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  transition: transform .12s ease, border-color .12s ease;
+}
+button:hover { border-color: var(--ink-2); }
+button:active { transform: scale(.97); }
+button:focus-visible, input:focus-visible { outline: 2.5px solid var(--zest); outline-offset: 2px; }
+button[aria-pressed="true"] { background: var(--ink); color: var(--paper-hi); border-color: var(--ink); }
+button.primary { background: var(--zest); color: #fff; border-color: var(--zest); padding: 12px 18px; font-size: 14px; }
+button svg { width: 14px; height: 14px; }
+
+.topbar {
+  position: absolute; z-index: 5; top: max(20px, env(safe-area-inset-top, 0px)); right: max(24px, env(safe-area-inset-right, 0px));
+  display: flex; gap: 8px; align-items: stretch;
+}
+.modes, .dock, .iconbtn {
+  background: var(--panel); border: 1.5px solid var(--rule); border-radius: 14px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.modes { display: flex; padding: 4px; gap: 4px; }
+.iconbtn { width: 46px; padding: 0; border-radius: 14px; }
+.iconbtn svg { width: 20px; height: 20px; }
+.dock {
+  position: absolute; z-index: 5; right: max(24px, env(safe-area-inset-right, 0px)); bottom: max(20px, env(safe-area-inset-bottom, 0px));
+  display: flex; gap: 4px; padding: 4px;
+}
+.dock button { border: 0; background: transparent; padding: 10px 14px; font-size: 14px; }
+.dock button svg { width: 17px; height: 17px; }
+.dock button[aria-pressed="true"] { background: var(--ink); color: var(--paper-hi); }
+.dock .sep { width: 1.5px; background: var(--rule); margin: 6px 2px; }
+.dock #panelBtn[aria-expanded="true"] { background: var(--paper); }
+body[data-mode="arcade"] .dock { display: none; }
+.modes button { border: 0; background: transparent; padding: 9px 13px; }
+.modes button[aria-pressed="true"] { background: var(--ink); color: var(--paper-hi); }
+
+.panel {
+  position: absolute; z-index: 4; top: calc(max(20px, env(safe-area-inset-top, 0px)) + 58px); right: max(24px, env(safe-area-inset-right, 0px));
+  width: 296px; padding: 16px; display: grid; gap: 16px; max-height: calc(100% - 180px); overflow-y: auto;
+  background: var(--panel); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1.5px solid var(--rule); border-radius: 18px;
+}
+.group { display: grid; gap: 8px; }
+.group-head { display: flex; justify-content: space-between; align-items: baseline; }
+.group-head small { font-size: 12px; color: var(--ink-2); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.fruits { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.fruit { flex-direction: column; gap: 6px; padding: 9px 2px 8px; border-radius: 12px; }
+.fruit .sw { width: 30px; height: 30px; border-radius: 50%; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(0,0,0,.07), 0 2px 4px rgba(60,40,10,.12); transition: transform .15s ease; }
+.fruit b { font: 600 11.5px/1 var(--f-body); white-space: nowrap; }
+.fruit:hover .sw { transform: rotate(-12deg) scale(1.06); }
+body[data-mode="challenge"] .fruit[aria-pressed="true"] { background: var(--paper-hi); color: var(--ink); outline: 2px solid var(--ink); outline-offset: -2px; }
+body[data-mode="free"] .fruit[aria-pressed="true"] { background: var(--paper-hi); color: var(--ink); border-color: var(--rule); }
+.slider { display: grid; gap: 4px; }
+.slider .row { display: flex; justify-content: space-between; align-items: baseline; }
+.slider output { font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.slider .ends { display: flex; justify-content: space-between; color: var(--ink-2); font-size: 12px; }
+input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 20px; background: transparent; margin: 0; }
+input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--rule); }
+input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--rule); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--zest); border: 3px solid var(--paper-hi); box-shadow: 0 1px 3px rgba(0,0,0,.25); margin-top: -7px; }
+input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--zest); border: 3px solid var(--paper-hi); }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.checks { display: flex; gap: 16px; font-size: 13px; flex-wrap: wrap; }
+.checks label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.checks input { accent-color: var(--zest); margin: 0; width: 15px; height: 15px; }
+.panel .credit { margin: 0; font-size: 10.5px; line-height: 1.4; color: var(--ink-2); opacity: .75; }
+.panel .credit b { font-weight: 600; }
+body[data-mode="arcade"] .panel { display: none; }
+
+.notes {
+  position: absolute; left: max(24px, env(safe-area-inset-left, 0px)); bottom: max(20px, env(safe-area-inset-bottom, 0px));
+  display: grid; gap: 14px; max-width: 390px; pointer-events: none;
+}
+.hint { margin: 0; font-size: 14px; line-height: 1.45; }
+.hint b { color: var(--zest); margin-right: 4px; }
+.stats { display: grid; grid-template-columns: repeat(4, auto); gap: 2px 24px; justify-content: start; margin: 0; }
+.stats dt { grid-row: 1; }
+.stats dd { grid-row: 2; margin: 0; font-family: var(--f-display); font-variation-settings: "SOFT" 100; font-weight: 600; font-size: 26px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stats dd small { font: 600 11px var(--f-body); color: var(--ink-2); margin-left: 3px; }
+body:not([data-mode="free"]) .notes { display: none; }
+
+
+.goal {
+  position: absolute; left: max(24px, env(safe-area-inset-left, 0px)); bottom: max(20px, env(safe-area-inset-bottom, 0px));
+  width: min(360px, calc(100% - 48px)); padding: 16px 18px; display: grid; gap: 8px;
+  background: var(--panel); border: 1.5px solid var(--rule); border-radius: 18px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.goal h2 { margin: 0; font-weight: 640; font-size: 32px; line-height: 1; }
+.goal p { margin: 0; font-size: 14px; color: var(--ink-2); line-height: 1.45; }
+.goal .meter { display: flex; gap: 5px; }
+.goal .meter i { width: 26px; height: 6px; border-radius: 3px; background: var(--rule); }
+.goal .meter i.on { background: var(--zest); }
+.goal .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+
+.hud {
+  position: absolute; left: 50%; transform: translateX(-50%); top: max(20px, env(safe-area-inset-top, 0px));
+  display: flex; gap: 30px; align-items: end; pointer-events: none; text-align: center; margin: 0;
+}
+.hud dd { margin: 0; font-family: var(--f-display); font-variation-settings: "SOFT" 100, "WONK" 1; font-weight: 700; font-size: 52px; line-height: 1; font-variant-numeric: tabular-nums; }
+.hud dt { margin-top: 4px; }
+.hud div { display: flex; flex-direction: column-reverse; }
+.hud .low dd { color: var(--zest); }
+
+.overlay {
+  position: absolute; inset: 0; z-index: 4; display: grid; place-items: center;
+  padding: 24px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px));
+  background: rgba(238, 236, 230, 0.4); pointer-events: auto;
+}
+.card {
+  width: min(420px, 100%); padding: 24px; display: grid; gap: 14px;
+  background: var(--paper-hi); border: 1.5px solid var(--rule); border-radius: 22px; box-shadow: 0 20px 60px rgba(60, 40, 10, 0.16);
+}
+.card h2 { margin: 0; font-weight: 640; font-size: 40px; line-height: 1; text-wrap: balance; }
+.card p { margin: 0; font-size: 15px; line-height: 1.5; color: var(--ink-2); }
+.card .big { font-family: var(--f-display); font-variation-settings: "SOFT" 100, "WONK" 1; font-weight: 700; font-size: 76px; line-height: 1; font-variant-numeric: tabular-nums; }
+.card .grade { color: var(--zest); }
+.card .btns { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.card .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0; }
+.card .facts dd { margin: 2px 0 0; font-family: var(--f-display); font-weight: 600; font-size: 26px; font-variant-numeric: tabular-nums; }
+.bars { display: grid; gap: 6px; }
+.bars div { display: grid; grid-template-columns: 1fr 58px; gap: 8px; align-items: center; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+.bars span { position: relative; height: 10px; background: var(--paper); border-radius: 5px; overflow: hidden; }
+.bars span b { position: absolute; inset: 0 auto 0 0; background: var(--zest); border-radius: 5px; }
+.bars span i { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); }
+
+.info {
+  position: absolute; width: 220px; padding: 14px 16px; display: grid; gap: 6px; pointer-events: auto; z-index: 3;
+  background: var(--paper-hi); border: 1.5px solid var(--rule); border-radius: 16px; box-shadow: 0 12px 34px rgba(60, 40, 10, 0.14);
+}
+.info .top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.info .top button { padding: 2px 7px; border: 0; background: transparent; font-size: 18px; line-height: 1; }
+.info .pct { font-family: var(--f-display); font-variation-settings: "SOFT" 100, "WONK" 1; font-weight: 700; font-size: 42px; line-height: 1; font-variant-numeric: tabular-nums; }
+.info .pct small { font: 600 14px var(--f-body); color: var(--zest); margin-left: 6px; }
+.info dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 0; font-size: 13px; }
+.info dt { color: var(--ink-2); }
+.info dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+
+.tag {
+  position: absolute; transform: translate(-50%, -100%); padding: 4px 7px; border-radius: 8px; white-space: nowrap;
+  font: 700 12px/1 var(--f-body); font-variant-numeric: tabular-nums; background: rgba(35, 32, 28, 0.88); color: var(--paper-hi);
+}
+.tag.preview { background: var(--zest); color: #fff; font-size: 13px; padding: 5px 8px; }
+.tag.preview em { font-style: normal; opacity: .6; margin: 0 5px; }
+.pop {
+  position: absolute; transform: translate(-50%, -50%); pointer-events: none; white-space: nowrap;
+  font-family: var(--f-display); font-variation-settings: "SOFT" 100, "WONK" 1; font-weight: 800; font-size: 36px; line-height: 1;
+  color: var(--ink); text-shadow: 0 2px 0 var(--paper-hi);
+  animation: pop 0.9s ease-out forwards;
+}
+.pop.combo { font-size: 48px; color: var(--zest); }
+@keyframes pop { 0% { opacity: 0; margin-top: 10px; scale: .7; } 15% { opacity: 1; scale: 1.08; } 30% { scale: 1; } 100% { opacity: 0; margin-top: -54px; } }
+.toast {
+  position: absolute; left: 50%; bottom: max(24px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  padding: 10px 14px; border-radius: 12px; background: var(--ink); color: var(--paper-hi); font-size: 13px; font-weight: 600; z-index: 6;
+}
+
+.err { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; font-size: 20px; }
+
+@media (max-width: 1150px) { .hint { display: none; } }
+@media (max-width: 760px) {
+  .masthead { left: max(16px, env(safe-area-inset-left, 0px)); top: max(66px, calc(env(safe-area-inset-top, 0px) + 62px)); max-width: calc(100% - 32px); }
+  .masthead h1 { font-size: 32px; }
+  #eyebrow { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .masthead p { display: none; }
+  .topbar { top: max(12px, env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); }
+  .modes { flex: 1; }
+  .modes button { flex: 1; padding: 9px 6px; }
+  .dock { right: auto; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom, 0px)); }
+  .dock button { padding: 10px 12px; }
+  .panel {
+    top: auto; width: auto; gap: 12px; padding: 12px; border-radius: 16px;
+    left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); bottom: calc(max(14px, env(safe-area-inset-bottom, 0px)) + 62px);
+    max-height: 58%;
+  }
+  .fruits { grid-template-columns: repeat(8, 1fr); gap: 4px; }
+  .fruit { padding: 7px 0; }
+  .fruit .sw { width: 24px; height: 24px; }
+  .fruit b { display: none; }
+  .notes { top: calc(max(66px, calc(env(safe-area-inset-top, 0px) + 62px)) + 104px); bottom: auto; left: max(16px, env(safe-area-inset-left, 0px)); }
+  .hint { display: none; }
+  .stats { gap: 2px 14px; }
+  .stats dd { font-size: 19px; }
+  .goal { top: calc(max(66px, calc(env(safe-area-inset-top, 0px) + 62px)) + 46px); bottom: auto; left: max(16px, env(safe-area-inset-left, 0px)); padding: 10px 14px; }
+  .goal h2 { font-size: 22px; }
+  .goal p { font-size: 13px; }
+  .hud { top: max(66px, calc(env(safe-area-inset-top, 0px) + 62px)); }
+  .hud dd { font-size: 38px; }
+  body[data-mode="arcade"] .masthead { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .pop { animation-duration: 0.01s; } button, .fruit .sw { transition: none; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="gl" aria-label="Fruit on a table. With the knife, drag a line across a fruit to cut it."></canvas>
+  <canvas id="ink"></canvas>
+  <div id="labels"></div>
+
+  <header class="masthead">
+    <div class="label" id="eyebrow">Fruit Lab · Navel orange · ⌀ 75 mm</div>
+    <h1 class="display" id="title">Whole <span>orange.</span></h1>
+    <p id="fact">Eleven segments under a 5 mm peel. Cut it as small as you like.</p>
+  </header>
+
+  <div class="topbar">
+    <nav class="modes" aria-label="Mode">
+      <button data-mode="free" aria-pressed="true">Free cut</button>
+      <button data-mode="challenge" aria-pressed="false">Challenges</button>
+      <button data-mode="arcade" aria-pressed="false">Arcade</button>
+    </nav>
+    <button class="iconbtn" id="soundBtn" aria-pressed="true" title="Sound (M)"></button>
+  </div>
+
+  <div class="dock" id="dock" aria-label="Tools">
+    <button id="toolHand" aria-pressed="false" title="Hand (H)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M5 8V3.5a1 1 0 0 1 2 0V7m0-4.5v-1a1 1 0 0 1 2 0V7m0-4a1 1 0 0 1 2 0v4.5m0-2.5a1 1 0 0 1 2 0v5c0 3-2 5-4.5 5S4.6 13.6 3.5 12L2 9.4a1 1 0 0 1 1.7-1L5 10"/></svg>Hand</button>
+    <button id="toolKnife" aria-pressed="true" title="Knife (K)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 14 9.5 6.5l2 2L6 13c-1.5 1-3 1.2-4 1Zm7.5-7.5 3-3a1.4 1.4 0 0 1 2 2l-3 3"/></svg>Knife</button>
+    <span class="sep" aria-hidden="true"></span>
+    <button id="panelBtn" aria-expanded="true" aria-controls="panel" title="Fruit and settings (F)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="9" r="5.2"/><path d="M8 3.8c0-1.4.8-2.3 2.2-2.6M8 3.8C6.6 2.6 5 2.6 4 3.4"/></svg>Fruit</button>
+  </div>
+
+  <aside class="panel" id="panel" aria-label="Table settings">
+    <div class="group">
+      <div class="group-head"><span class="label" id="fruitsLabel">Add to the table</span><small id="fruitsNote">real size</small></div>
+      <div class="fruits" id="fruits"></div>
+    </div>
+    <div class="slider">
+      <div class="row"><label class="label" for="firm">Firmness</label><output id="firmOut">0.50</output></div>
+      <input type="range" id="firm" min="0" max="1" step="0.01" value="0.5">
+      <div class="ends"><span>overripe</span><span>firm</span></div>
+    </div>
+    <div class="actions">
+      <button id="nudge">Shake table</button>
+      <button id="reset" title="Clear the table (R)">Clear table</button>
+    </div>
+    <p class="credit">A personal sandbox by <b>Václav Jícha</b>, vibe-coded with Claude Opus 5.5.</p>
+  </aside>
+
+  <footer class="notes">
+    <p class="hint" id="hint"></p>
+    <dl class="stats">
+      <dt class="label">Pieces</dt><dd id="sPieces">1</dd>
+      <dt class="label">Cuts</dt><dd id="sCuts">0</dd>
+      <dt class="label">Cut surface</dt><dd><span id="sArea">0</span><small>cm²</small></dd>
+      <dt class="label">On the table</dt><dd><span id="sMass">197</span><small id="sMassU">g</small></dd>
+    </dl>
+  </footer>
+
+
+  <section class="goal" id="goal" hidden>
+    <div class="row"><span class="label" id="gStep">Challenge 1 of 5</span><span class="label" id="gBest"></span></div>
+    <h2 class="display" id="gName">Halves</h2>
+    <p id="gText">Cut the fruit into two equal halves.</p>
+    <div class="row"><div class="meter" id="gMeter"></div><span class="label" id="gCuts">Cuts 0 / 1</span></div>
+  </section>
+
+  <dl class="hud" id="hud" hidden>
+    <div><dt class="label">Score</dt><dd id="hScore">0</dd></div>
+    <div id="hTimeBox"><dt class="label">Seconds</dt><dd id="hTime">60</dd></div>
+  </dl>
+
+  <div class="info" id="info" hidden></div>
+  <div class="toast" id="toast" hidden></div>
+  <div class="overlay" id="overlay" hidden><div class="card" id="card"></div></div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* =========================================================
+   World scale: 1 unit = 37.5 mm everywhere (an orange has radius 1).
+   Each fruit is modelled with radius ~1 and scaled by k = mmPerUnit / 37.5,
+   so a lime, an orange and a watermelon keep their real proportions.
+   Gravity is the real 9.81 m/s² in these units.
+   ========================================================= */
+const MM_PER_UNIT = 37.5;
+const G_REAL = 9810 / MM_PER_UNIT;   // ≈ 262 units/s²
+const G_ARCADE = 26;
+const CM = MM_PER_UNIT / 10;
+
+const FRUITS = {
+  orange: {
+    name: 'orange', variety: 'Navel orange', size: '⌀ 75 mm', mmPerUnit: 37.5, density: 0.96,
+    axes: [1, 0.93, 1], tip: 0, flare: 0, lie: false, kind: 0, seg: 11,
+    peel: '#ec8312', flesh: '#e57a08', flesh2: '#ffa62e', alt: '#e57a08', mottle: 0, pith: '#f1ddb4', pithAt: 0.85, zestAt: 0.95,
+    skin: 'citrus', dimple: 1, rough: 0.5, juice: '#f39a24',
+    fact: 'Eleven segments under a 5 mm peel. Cut it as small as you like.',
+    sw: 'radial-gradient(circle,#f0a238 0 56%,#f1ddb4 56% 70%,#ec8312 70%)',
+  },
+  lemon: {
+    name: 'lemon', variety: 'Eureka lemon', size: '58 × 80 mm', mmPerUnit: 36.4, density: 0.95,
+    axes: [0.8, 1, 0.8], tip: 0.1, flare: 0, lie: true, kind: 0, seg: 9,
+    peel: '#f2cf2e', flesh: '#e9d14f', flesh2: '#fff1a0', alt: '#e9d14f', mottle: 0, pith: '#f4ecc6', pithAt: 0.84, zestAt: 0.955,
+    skin: 'citrus', dimple: 0.8, rough: 0.45, juice: '#f2df6a',
+    fact: 'Nine segments, a pointed nub at each end and plenty of sour juice.',
+    sw: 'radial-gradient(circle,#efd967 0 54%,#f4ecc6 54% 70%,#f2cf2e 70%)',
+  },
+  lime: {
+    name: 'lime', variety: 'Persian lime', size: '⌀ 50 mm', mmPerUnit: 25, density: 0.97,
+    axes: [1, 0.96, 1], tip: 0.03, flare: 0, lie: false, kind: 0, seg: 10,
+    peel: '#4f8f26', flesh: '#9fc23e', flesh2: '#d9ec8c', alt: '#9fc23e', mottle: 0, pith: '#eef0c8', pithAt: 0.9, zestAt: 0.965,
+    skin: 'citrus', dimple: 0.6, rough: 0.42, juice: '#b8d45a',
+    fact: 'Ten segments and a thin rind. Small, so every millimetre counts.',
+    sw: 'radial-gradient(circle,#b5d158 0 60%,#eef0c8 60% 72%,#4f8f26 72%)',
+  },
+  grapefruit: {
+    name: 'grapefruit', variety: 'Ruby grapefruit', size: '⌀ 105 mm', mmPerUnit: 52.5, density: 0.93,
+    axes: [1, 0.92, 1], tip: 0, flare: 0, lie: false, kind: 0, seg: 12,
+    peel: '#efae3e', flesh: '#e0503f', flesh2: '#ff9a84', alt: '#e0503f', mottle: 0, pith: '#f5e6cf', pithAt: 0.86, zestAt: 0.955,
+    skin: 'citrus', dimple: 1.15, rough: 0.5, juice: '#ee7a66',
+    fact: 'Twelve pink segments. The heaviest citrus here, around half a kilo.',
+    sw: 'radial-gradient(circle,#ea6a55 0 56%,#f5e6cf 56% 70%,#efae3e 70%)',
+  },
+  kiwi: {
+    name: 'kiwi', variety: 'Green kiwifruit', size: '50 × 70 mm', mmPerUnit: 35, density: 1.03,
+    axes: [0.78, 1, 0.72], tip: 0, flare: 0, lie: true, kind: 1, seg: 0,
+    peel: '#7a5a32', flesh: '#5f9e24', flesh2: '#cfe08a', alt: '#5f9e24', mottle: 0, pith: '#efeccb', pithAt: 0, zestAt: 0.97,
+    skin: 'kiwi', dimple: 0, rough: 0.92, juice: '#9cc24a',
+    fact: 'A pale core, a ring of tiny black seeds and a fuzzy brown skin.',
+    sw: 'radial-gradient(circle,#efeccb 0 16%,#7fb23a 16% 32%,#1f1a10 32% 40%,#5f9e24 40% 80%,#7a5a32 80%)',
+  },
+  watermelon: {
+    name: 'watermelon', variety: 'Personal watermelon', size: '190 × 220 mm', mmPerUnit: 110, density: 0.95,
+    axes: [0.86, 1, 0.86], tip: 0, flare: 0, lie: true, kind: 2, seg: 0,
+    peel: '#2c5a22', flesh: '#e2323e', flesh2: '#ff8f8f', alt: '#b9d68a', mottle: 0, pith: '#eef2d6', pithAt: 0.84, zestAt: 0.955,
+    skin: 'melon', dimple: 0, rough: 0.42, juice: '#ef5f6a',
+    fact: 'Nearly four kilos of red flesh, black seeds and a thick white rind.',
+    sw: 'radial-gradient(circle,#e2323e 0 62%,#eef2d6 62% 72%,#b9d68a 72% 78%,#2c5a22 78%)',
+  },
+  avocado: {
+    name: 'avocado', variety: 'Hass avocado', size: '62 × 100 mm', mmPerUnit: 50, density: 1.0,
+    axes: [0.62, 1, 0.62], tip: 0, flare: -0.2, lie: true, kind: 4, seg: 0,
+    peel: '#2a3518', flesh: '#86ad35', flesh2: '#e9e18c', alt: '#86ad35', mottle: 0, pith: '#e9e18c', pithAt: 0, zestAt: 0.975,
+    skin: 'avocado', dimple: 0, rough: 0.7, juice: '#c9d27a',
+    fact: 'Buttery flesh around one large stone. This knife goes straight through it.',
+    sw: 'radial-gradient(circle,#7a5232 0 30%,#e9e18c 30% 54%,#86ad35 54% 82%,#2a3518 82%)',
+  },
+  apple: {
+    name: 'apple', variety: 'Red apple', size: '⌀ 80 mm', mmPerUnit: 40, density: 0.82,
+    axes: [1, 0.86, 1], tip: 0, flare: 0.07, lie: false, kind: 3, seg: 0,
+    peel: '#b51f2a', flesh: '#f2e6c0', flesh2: '#e6d38f', alt: '#f2e6c0', mottle: 0, pith: '#f2e6c0', pithAt: 0, zestAt: 0.98,
+    skin: 'apple', dimple: 0, rough: 0.32, juice: '#efe2b0',
+    fact: 'Five seeds in a star-shaped core. Light enough to float in water.',
+    sw: 'radial-gradient(circle,#e6d38f 0 18%,#f2e6c0 18% 84%,#b51f2a 84%)',
+  },
+};
+const FRUIT_KEYS = Object.keys(FRUITS);
+const cap1 = (s) => s[0].toUpperCase() + s.slice(1);
+
+const CHALLENGES = [
+  { name: 'Halves', cuts: 1, shares: [1 / 2, 1 / 2], text: 'Cut it into two equal halves with one cut.' },
+  { name: 'One third', cuts: 1, shares: [2 / 3, 1 / 3], text: 'Cut off exactly a third of the fruit. One cut.' },
+  { name: 'Quarters', cuts: 2, shares: [1 / 4, 1 / 4, 1 / 4, 1 / 4], text: 'Four equal pieces in two cuts.' },
+  { name: 'Six wedges', cuts: 3, shares: Array(6).fill(1 / 6), text: 'Six equal wedges in three cuts, like slicing a cake.' },
+  { name: 'Eighths', cuts: 3, shares: Array(8).fill(1 / 8), text: 'Eight equal pieces in three cuts. Move pieces with the hand if you need to.' },
+];
+const GRADES = [[97, 'Surgeon'], [92, 'Head chef'], [84, 'Line cook'], [70, 'Home cook'], [0, 'Smoothie']];
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('fruitlab.' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('fruitlab.' + k, JSON.stringify(v)); } catch { /* storage unavailable */ } },
+};
+
+const DAMP = 0.45;
+const MAX_ORIGINS = 12;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const state = {
+  mode: 'free', tool: 'knife', fruit: 'orange', firm: 0.5, sizes: false, sound: store.get('sound', true),
+  cuts: 0, locked: false, selected: null, autoZoom: true, panelOpen: store.get('panel', innerWidth > 760),
+  ch: { i: 0, used: 0, done: false },
+  arc: { running: false, time: 60, score: 0, splits: 0, dropped: 0, spawnT: 0, bestCombo: 0 },
+};
+
+/* ---------- renderer / scene ---------- */
+const $ = (id) => document.getElementById(id);
+const canvas = $('gl'), ink = $('ink'), ictx = ink.getContext('2d');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+} catch (e) {
+  const d = document.createElement('div'); d.className = 'err';
+  d.textContent = 'This browser did not allow WebGL, so the fruit cannot be drawn.';
+  $('app').appendChild(d);
+  throw e;
+}
+const DPR_MAX = Math.min(devicePixelRatio || 1, 1.75);
+let dpr = DPR_MAX;
+renderer.setPixelRatio(dpr);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setClearColor(0x000000, 0);
+
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
+const camTarget = new THREE.Vector3(0, 0.45, 0);
+const orbit = { az: 0.0, el: 0.66, r: 11.5, rGoal: 11.5, ty: 0.45 };
+let viewRect = canvas.getBoundingClientRect();
+function updateCamera() {
+  const { az, el, r } = orbit;
+  camTarget.y = orbit.ty;
+  camera.position.set(camTarget.x + r * Math.cos(el) * Math.sin(az), camTarget.y + r * Math.sin(el), camTarget.z + r * Math.cos(el) * Math.cos(az));
+  camera.lookAt(camTarget);
+  const minW = state.mode === 'arcade' ? 9 : 5.6, tanH = Math.tan(THREE.MathUtils.degToRad(15));
+  const fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.max(tanH, (minW / 2) / r / camera.aspect)));
+  if (Math.abs(fov - camera.fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
+  camera.updateMatrixWorld();
+}
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0xd8d2c6, 0.8));
+const sun = new THREE.DirectionalLight(0xfff4e6, 2.5);
+sun.position.set(-3.2, 9, 3.6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.bias = -0.0005;
+sun.shadow.normalBias = 0.04;
+scene.add(sun); scene.add(sun.target);
+let shadowSize = 0;
+function fitShadow(extent) {
+  const s = Math.max(6, Math.ceil(extent + 2));
+  if (s === shadowSize) return;
+  shadowSize = s;
+  const c = sun.shadow.camera;
+  Object.assign(c, { left: -s, right: s, top: s, bottom: -s, near: 1, far: 40 });
+  sun.position.set(-3.2, 9 + s * 0.4, 3.6);
+  c.updateProjectionMatrix();
+}
+fitShadow(4);
+const fill = new THREE.DirectionalLight(0xe8f0ff, 0.5);
+fill.position.set(5, 3, -2);
+scene.add(fill);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.ShadowMaterial({ opacity: 0.2, color: 0x3b2a12 }));
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+/* ---------- procedural skin textures ---------- */
+function canvas2d(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; }
+function sphereDots(ctx, W, H, n, rMin, rMax, styleFn) {
+  for (let i = 0; i < n; i++) {
+    const v = Math.acos(1 - 2 * Math.random()) / Math.PI, y = v * H, x = Math.random() * W;
+    const lat = Math.max(Math.sin(v * Math.PI), 0.04), rad = rMin + Math.random() * (rMax - rMin);
+    const rx = Math.min(rad / lat, 60);
+    ctx.fillStyle = styleFn();
+    for (const ox of [0, -W, W]) {
+      if (ox && Math.abs(x + ox - W / 2) > W / 2 + rx) continue;
+      ctx.beginPath(); ctx.ellipse(x + ox, y, rx, rad, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+}
+function makeSkin(f) {
+  const W = 1024, H = 512;
+  const [col, c] = canvas2d(W, H);
+  const [raw, r] = canvas2d(W, H);
+  r.fillStyle = '#7a7a7a'; r.fillRect(0, 0, W, H);
+  c.fillStyle = f.peel; c.fillRect(0, 0, W, H);
+  if (f.skin === 'citrus') {
+    sphereDots(r, W, H, 22000 * f.dimple, 1.1 * f.dimple, 3 * f.dimple, () => (Math.random() < 0.85 ? 'rgba(0,0,0,0.30)' : 'rgba(255,255,255,0.25)'));
+    sphereDots(c, W, H, 520, 12, 44, () => (Math.random() < 0.6 ? 'rgba(120,60,0,0.05)' : 'rgba(255,245,190,0.07)'));
+    let g = c.createLinearGradient(0, 0, 0, 18);
+    g.addColorStop(0, 'rgba(80,78,30,0.95)'); g.addColorStop(0.45, 'rgba(120,110,40,0.55)'); g.addColorStop(1, 'rgba(160,120,40,0)');
+    c.fillStyle = g; c.fillRect(0, 0, W, 18);
+    g = c.createLinearGradient(0, H - 14, 0, H);
+    g.addColorStop(0, 'rgba(140,90,20,0)'); g.addColorStop(1, 'rgba(120,80,20,0.6)');
+    c.fillStyle = g; c.fillRect(0, H - 14, W, 14);
+  } else if (f.skin === 'kiwi') {
+    sphereDots(r, W, H, 50000, 0.6, 1.4, () => (Math.random() < 0.5 ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.3)'));
+    sphereDots(c, W, H, 26000, 0.6, 1.6, () => (Math.random() < 0.5 ? 'rgba(60,40,15,0.25)' : 'rgba(170,140,90,0.22)'));
+    sphereDots(c, W, H, 300, 14, 40, () => 'rgba(50,35,15,0.06)');
+  } else if (f.skin === 'melon') {
+    const stripes = 16;
+    c.fillStyle = '#6d9a3c';
+    for (let s = 0; s < stripes; s++) {
+      const x0 = (s / stripes) * W, w = W / stripes * 0.42;
+      c.beginPath();
+      for (let y = 0; y <= H; y += 4) { const j = Math.sin(y * 0.09 + s * 1.7) * 7 + Math.sin(y * 0.031 + s) * 10; c.lineTo(x0 + j, y); }
+      for (let y = H; y >= 0; y -= 4) { const j = Math.sin(y * 0.08 + s * 2.3) * 7 + Math.sin(y * 0.027 + s) * 10; c.lineTo(x0 + w + j, y); }
+      c.fill();
+    }
+    sphereDots(c, W, H, 900, 4, 18, () => (Math.random() < 0.5 ? 'rgba(20,50,15,0.12)' : 'rgba(150,190,90,0.10)'));
+    const g = c.createRadialGradient(W * 0.25, H * 0.5, 0, W * 0.25, H * 0.5, 120);
+    g.addColorStop(0, 'rgba(225,215,120,0.75)'); g.addColorStop(1, 'rgba(225,215,120,0)');
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    sphereDots(r, W, H, 4000, 2, 6, () => 'rgba(0,0,0,0.12)');
+  } else if (f.skin === 'avocado') {
+    sphereDots(r, W, H, 9000, 2, 5, () => (Math.random() < 0.7 ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)'));
+    sphereDots(c, W, H, 5000, 2, 5, () => (Math.random() < 0.5 ? 'rgba(10,15,5,0.25)' : 'rgba(70,90,40,0.18)'));
+    sphereDots(c, W, H, 260, 14, 40, () => 'rgba(40,20,30,0.12)');
+  } else if (f.skin === 'apple') {
+    for (let i = 0; i < 700; i++) {
+      const x = Math.random() * W, y = H * (0.25 + Math.random() * 0.75), len = 30 + Math.random() * 120;
+      c.strokeStyle = Math.random() < 0.5 ? 'rgba(220,170,60,0.10)' : 'rgba(110,10,20,0.14)';
+      c.lineWidth = 2 + Math.random() * 6;
+      c.beginPath(); c.moveTo(x, y); c.lineTo(x + (Math.random() - 0.5) * 8, y - len); c.stroke();
+    }
+    let g = c.createLinearGradient(0, H * 0.55, 0, H);
+    g.addColorStop(0, 'rgba(230,180,60,0)'); g.addColorStop(1, 'rgba(230,180,60,0.45)');
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    sphereDots(c, W, H, 1600, 0.8, 1.8, () => 'rgba(255,230,170,0.55)');
+    g = c.createLinearGradient(0, 0, 0, 22);
+    g.addColorStop(0, 'rgba(90,70,30,0.95)'); g.addColorStop(1, 'rgba(90,70,30,0)');
+    c.fillStyle = g; c.fillRect(0, 0, W, 22);
+    sphereDots(r, W, H, 3000, 1, 3, () => 'rgba(0,0,0,0.06)');
+  }
+  const [bump, b] = canvas2d(W, H);
+  b.filter = 'blur(1.2px)'; b.drawImage(raw, 0, 0);
+  const map = new THREE.CanvasTexture(col); map.colorSpace = THREE.SRGBColorSpace;
+  const bm = new THREE.CanvasTexture(bump);
+  for (const t of [map, bm]) { t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4; }
+  return { map, bump: bm };
+}
+function makeStainTexture() {
+  const s = 128, [cv, c] = canvas2d(s, s);
+  const g = c.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0, 'rgba(255,255,255,0.75)'); g.addColorStop(0.6, 'rgba(255,255,255,0.4)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = g; c.fillRect(0, 0, s, s);
+  for (let i = 0; i < 14; i++) {
+    const a = Math.random() * Math.PI * 2, d = 20 + Math.random() * 34, r = 3 + Math.random() * 8;
+    c.fillStyle = 'rgba(255,255,255,0.45)';
+    c.beginPath(); c.arc(s / 2 + Math.cos(a) * d, s / 2 + Math.sin(a) * d, r, 0, Math.PI * 2); c.fill();
+  }
+  return new THREE.CanvasTexture(cv);
+}
+const stainTex = makeStainTexture();
+
+/* ---------- flesh shader (one program, per-fruit uniforms) ---------- */
+const FLESH_GLSL = /* glsl */`
+uniform float uKind; uniform float uSeg; uniform vec3 uAxes; uniform float uTip; uniform float uFlare;
+uniform vec3 uFlesh; uniform vec3 uFlesh2; uniform vec3 uAlt; uniform vec3 uPith; uniform vec3 uPeelC;
+uniform float uMottle; uniform float uPithAt; uniform float uZestAt;
+varying vec3 vO;
+float h31(vec3 p){ p = fract(p*vec3(.1031,.1030,.0973)); p += dot(p, p.yxz+33.33); return fract((p.x+p.y)*p.z); }
+vec3 h33(vec3 p){ p = fract(p*vec3(.1031,.1030,.0973)); p += dot(p, p.yxz+33.33); return fract((p.xxy+p.yxx)*p.zyx); }
+float vnoise(vec3 p){ vec3 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
+  return mix(mix(mix(h31(i),h31(i+vec3(1,0,0)),f.x), mix(h31(i+vec3(0,1,0)),h31(i+vec3(1,1,0)),f.x),f.y),
+             mix(mix(h31(i+vec3(0,0,1)),h31(i+vec3(1,0,1)),f.x), mix(h31(i+vec3(0,1,1)),h31(i+vec3(1,1,1)),f.x),f.y), f.z); }
+vec2 worley(vec3 p){ vec3 i=floor(p), f=fract(p); float d1=8., d2=8.;
+  for(int x=-1;x<=1;x++) for(int y=-1;y<=1;y++) for(int z=-1;z<=1;z++){
+    vec3 g=vec3(float(x),float(y),float(z)); vec3 r=g+h33(i+g)-f; float d=dot(r,r);
+    if(d<d1){ d2=d1; d1=d; } else if(d<d2){ d2=d; } }
+  return vec2(sqrt(d1), sqrt(d2)); }
+vec3 unshape(vec3 p){
+  vec3 e = p / uAxes;
+  float k = 1.0 + uFlare * e.y; e.x /= k; e.z /= k;
+  float t = 1.0 + uTip * pow(min(abs(e.y), 1.0), 6.0); e.y /= t;
+  t = 1.0 + uTip * pow(min(abs(e.y), 1.0), 6.0); e.y = p.y / uAxes.y / t;
+  return e;
+}
+vec3 citrus(vec3 e){
+  float rr = length(e), rad = length(e.xz), ang = atan(e.z, e.x);
+  float a = (ang/6.2831853 + 0.5)*uSeg + 0.13*sin(e.y*4.0 + rad*3.0) + 0.05*sin(rad*9.0 + e.y*2.0);
+  float seg = fract(a);
+  float arc = min(seg, 1.0-seg) * 6.2831853/uSeg * max(rad, 0.05);
+  float membrane = 1.0 - smoothstep(0.004, 0.017, arc);
+  vec2 w = worley(vec3(rad*10.5, a*3.1, e.y*15.0));
+  float cellEdge = smoothstep(0.0, 0.2, w.y - w.x);
+  float sparkle = smoothstep(0.32, 0.0, w.x);
+  vec3 base = uFlesh * (0.94 + 0.12*h31(vec3(floor(a), 3.0, 7.0)));
+  if (uMottle > 0.0) { float m = vnoise(e*3.2 + 7.0)*0.7 + vnoise(e*9.0)*0.3; base = mix(base, uAlt, smoothstep(0.42, 0.78, m)*uMottle); }
+  vec3 col = mix(base*0.5, mix(base, uFlesh2, 0.4), cellEdge);
+  col = mix(col, uFlesh2, sparkle*0.3);
+  col *= 0.86 + 0.14*smoothstep(0.08, 0.7, rad);
+  col = mix(col, mix(uPith, base, 0.5), membrane*0.75);
+  col = mix(col, uPith*0.96, 1.0 - smoothstep(0.075, 0.13, rad));
+  col = mix(col, mix(uPith, mix(uPith, uPeelC, 0.3), smoothstep(uPithAt+0.03, uZestAt, rr)), smoothstep(uPithAt, uPithAt+0.02, rr));
+  col = mix(col, uPeelC*0.95, smoothstep(uZestAt, uZestAt+0.015, rr));
+  return col;
+}
+vec3 kiwi(vec3 e){
+  float rr = length(e), rad = length(e.xz), ang = atan(e.z, e.x);
+  vec3 col = mix(uFlesh, uFlesh2, smoothstep(0.62, 0.16, rad) * 0.85);
+  float st = 0.5 + 0.5*sin(ang*70.0 + 4.0*vnoise(e*5.0));
+  col *= 0.9 + 0.1*mix(1.0, st, smoothstep(0.2, 0.5, rad));
+  col *= 0.92 + 0.08*vnoise(e*18.0);
+  float n = 44.0, aa = (ang/6.2831853 + 0.5)*n, id = floor(aa), cell = fract(aa) - 0.5;
+  float yz = e.y*7.0, idy = floor(yz), cy = fract(yz) - 0.5;
+  float rs = 0.31 + 0.05*h31(vec3(id, idy, 2.0));
+  vec3 q = vec3(cell*6.2831853/n*max(rad,0.05)/0.016, (rad - rs)/0.045, cy/0.32);
+  float seed = (1.0 - smoothstep(0.75, 1.0, length(q))) * (1.0 - smoothstep(0.82, 0.92, abs(e.y)));
+  col = mix(col, vec3(0.05, 0.04, 0.02), seed);
+  float coreR = 0.17*(1.0 - 0.5*e.y*e.y);
+  col = mix(col, uPith, 1.0 - smoothstep(coreR - 0.03, coreR, rad));
+  col = mix(col, uPeelC*0.8, smoothstep(uZestAt - 0.01, uZestAt + 0.01, rr));
+  return col;
+}
+vec3 melon(vec3 e){
+  float rr = length(e);
+  vec3 col = uFlesh * (0.88 + 0.22*vnoise(e*9.0));
+  vec2 w2 = worley(e*26.0);
+  col = mix(col*0.86, mix(col, uFlesh2, 0.5), smoothstep(0.0, 0.25, w2.y - w2.x));
+  vec2 w = worley(e*5.0 + 3.0);
+  float seedMask = (1.0 - smoothstep(0.09, 0.12, w.x)) * smoothstep(0.32, 0.4, rr) * (1.0 - smoothstep(0.7, 0.76, rr));
+  col = mix(col, vec3(0.07, 0.04, 0.03), seedMask);
+  col = mix(col, mix(uFlesh, uPith, 0.6), smoothstep(uPithAt - 0.06, uPithAt, rr));
+  col = mix(col, uPith, smoothstep(uPithAt, uPithAt + 0.02, rr));
+  col = mix(col, uAlt, smoothstep(0.9, 0.93, rr));
+  col = mix(col, uPeelC, smoothstep(uZestAt, uZestAt + 0.012, rr));
+  return col;
+}
+vec3 apple(vec3 e){
+  float rr = length(e), rad = length(e.xz), ang = atan(e.z, e.x);
+  vec3 col = uFlesh * (0.95 + 0.08*vnoise(e*10.0));
+  float yfac = 1.0 - smoothstep(0.3, 0.6, abs(e.y));
+  float star = (0.2 + 0.07*cos(5.0*ang)) * yfac;
+  col = mix(col, uFlesh2, (1.0 - smoothstep(star - 0.02, star, rad)) * 0.55);
+  float a5 = ang*5.0/6.2831853, sid = floor(a5 + 0.5);
+  float da = (a5 - sid)*6.2831853/5.0*rad;
+  float seed = 1.0 - smoothstep(0.75, 1.0, length(vec3(da/0.035, (rad - 0.14)/0.055, (e.y + 0.02)/0.2)));
+  col = mix(col, vec3(0.28, 0.14, 0.06), seed);
+  float bund = abs(rad - (0.42 + 0.04*cos(5.0*ang)));
+  col = mix(col, uFlesh2, (1.0 - smoothstep(0.004, 0.012, bund)) * 0.5 * yfac);
+  col = mix(col, uFlesh2*0.9, (1.0 - smoothstep(0.03, 0.06, rad)) * smoothstep(0.55, 0.75, abs(e.y)));
+  col = mix(col, uPeelC, smoothstep(uZestAt - 0.008, uZestAt + 0.006, rr));
+  return col;
+}
+vec3 avocado(vec3 e){
+  float rr = length(e);
+  float pr = length((e - vec3(0.0, -0.24, 0.0)) / vec3(1.0, 1.12, 1.0));
+  vec3 col = mix(uFlesh2, uFlesh, smoothstep(0.5, 0.94, rr));
+  col *= 0.95 + 0.07*vnoise(e*12.0);
+  vec3 pitC = mix(vec3(0.83, 0.72, 0.5), vec3(0.62, 0.45, 0.26), smoothstep(0.1, 0.45, pr));
+  pitC = mix(pitC, vec3(0.33, 0.19, 0.1), smoothstep(0.455, 0.47, pr));
+  col = mix(col, mix(col, uFlesh2*1.05, 0.6), (1.0 - smoothstep(0.5, 0.58, pr)));
+  col = mix(col, pitC, 1.0 - smoothstep(0.495, 0.505, pr));
+  col = mix(col, uPeelC, smoothstep(uZestAt - 0.008, uZestAt + 0.008, rr));
+  return col;
+}
+vec3 fleshColor(vec3 p){
+  vec3 e = unshape(p);
+  if (uKind < 0.5) return citrus(e);
+  if (uKind < 1.5) return kiwi(e);
+  if (uKind < 2.5) return melon(e);
+  if (uKind < 3.5) return apple(e);
+  return avocado(e);
+}`;
+
+const matCache = {};
+function getMats(key) {
+  if (matCache[key]) return matCache[key];
+  const f = FRUITS[key], skin = makeSkin(f);
+  const peel = new THREE.MeshStandardMaterial({
+    color: 0xffffff, map: skin.map, bumpMap: skin.bump, bumpScale: f.skin === 'apple' ? 0.4 : 1.6,
+    roughness: f.rough * 0.9, envMapIntensity: 0.6,
+  });
+  const U = {
+    uKind: { value: f.kind }, uSeg: { value: f.seg }, uAxes: { value: new THREE.Vector3(...f.axes) }, uTip: { value: f.tip }, uFlare: { value: f.flare },
+    uFlesh: { value: new THREE.Color(f.flesh) }, uFlesh2: { value: new THREE.Color(f.flesh2) }, uAlt: { value: new THREE.Color(f.alt) },
+    uPith: { value: new THREE.Color(f.pith) }, uPeelC: { value: new THREE.Color(f.peel) }, uMottle: { value: f.mottle },
+    uPithAt: { value: f.pithAt }, uZestAt: { value: f.zestAt },
+  };
+  const flesh = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: f.kind === 3 ? 0.55 : 0.36, envMapIntensity: 0.55 });
+  flesh.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, U);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute vec3 aOrange;\nvarying vec3 vO;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvO = aOrange;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\n' + FLESH_GLSL)
+      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = fleshColor(vO);');
+  };
+  return (matCache[key] = { peel, flesh, list: [peel, flesh] });
+}
+
+/* ---------- convex polyhedron clipping ----------
+   A polyhedron is a list of faces { v: [Vector3 in fruit space (world-scaled), CCW from outside], cut, n }.
+   Face lists are never mutated, so templates can be shared between fruits. */
+function shapePoint(d, f) {
+  const p = new THREE.Vector3(d.x * f.axes[0], d.y * f.axes[1], d.z * f.axes[2]);
+  if (f.tip) p.y *= 1 + f.tip * Math.pow(Math.abs(d.y), 6);
+  if (f.flare) { const k = 1 + f.flare * d.y; p.x *= k; p.z *= k; }
+  return p;
+}
+function fruitFaces(f, detail, scale, withNormals) {
+  const geo = new THREE.IcosahedronGeometry(1, detail);
+  const pa = geo.attributes.position, faces = [];
+  const nmap = new Map();
+  const key = (d) => `${Math.round(d.x * 1e4)},${Math.round(d.y * 1e4)},${Math.round(d.z * 1e4)}`;
+  for (let i = 0; i < pa.count; i += 3) {
+    const v = [0, 1, 2].map((k) => {
+      const d = new THREE.Vector3(pa.getX(i + k), pa.getY(i + k), pa.getZ(i + k)).normalize();
+      const p = shapePoint(d, f).multiplyScalar(scale);
+      p.dir = d;
+      return p;
+    });
+    faces.push({ v, cut: false });
+    if (withNormals) {
+      const fn = new THREE.Vector3().crossVectors(new THREE.Vector3().subVectors(v[1], v[0]), new THREE.Vector3().subVectors(v[2], v[0]));
+      for (const p of v) { const k = key(p.dir); const acc = nmap.get(k); if (acc) acc.add(fn); else nmap.set(k, fn.clone()); }
+    }
+  }
+  if (withNormals) for (const fc of faces) for (const p of fc.v) p.nn = nmap.get(key(p.dir)).clone().normalize();
+  geo.dispose();
+  return faces;
+}
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
+function cleanPoly(vs) {
+  const out = vs.slice();
+  let changed = true, guard = 0;
+  while (changed && out.length >= 3 && guard++ < 64) {
+    changed = false;
+    for (let i = 0; i < out.length; i++) {
+      const p = out[(i + out.length - 1) % out.length], q = out[i], r = out[(i + 1) % out.length];
+      if (q.distanceToSquared(p) < 1e-12) { out.splice(i, 1); changed = true; break; }
+      _a.subVectors(q, p); _b.subVectors(r, q);
+      if (_c.crossVectors(_a, _b).lengthSq() < 1e-14 * Math.max(_a.lengthSq() * _b.lengthSq(), 1e-30) + 1e-20) { out.splice(i, 1); changed = true; break; }
+    }
+  }
+  return out;
+}
+function lerpVert(a, b, t) {
+  const p = a.clone().lerp(b, t);
+  if (a.nn && b.nn) p.nn = a.nn.clone().lerp(b.nn, t).normalize();
+  if (a.dir && b.dir) p.dir = a.dir.clone().lerp(b.dir, t).normalize();
+  return p;
+}
+function clipPoly(faces, n, d, backOnly) {
+  const back = [], front = [], cap = [], EPS = 1e-7;
+  for (const f of faces) {
+    const vs = f.v, m = vs.length;
+    let neg = false, pos = false;
+    const ds = new Array(m);
+    for (let i = 0; i < m; i++) { ds[i] = n.x * vs[i].x + n.y * vs[i].y + n.z * vs[i].z - d; if (ds[i] < -EPS) neg = true; else if (ds[i] > EPS) pos = true; }
+    if (!pos) { back.push(f); for (let i = 0; i < m; i++) if (ds[i] >= -EPS) cap.push(vs[i]); continue; }
+    if (!neg) { if (!backOnly) front.push(f); for (let i = 0; i < m; i++) if (ds[i] <= EPS) cap.push(vs[i]); continue; }
+    const B = [], F = [];
+    for (let i = 0; i < m; i++) {
+      const j = (i + 1) % m, a = vs[i], si = ds[i] < -EPS ? -1 : ds[i] > EPS ? 1 : 0, sj = ds[j] < -EPS ? -1 : ds[j] > EPS ? 1 : 0;
+      if (si <= 0) B.push(a);
+      if (si >= 0) F.push(a);
+      if (si === 0) cap.push(a);
+      if (si * sj < 0) {
+        const p = lerpVert(a, vs[j], ds[i] / (ds[i] - ds[j]));
+        B.push(p); F.push(p); cap.push(p);
+      }
+    }
+    if (B.length >= 3) { const c = cleanPoly(B); if (c.length >= 3) back.push({ v: c, cut: f.cut, n: f.n }); }
+    if (!backOnly && F.length >= 3) { const c = cleanPoly(F); if (c.length >= 3) front.push({ v: c, cut: f.cut, n: f.n }); }
+  }
+  return { back, front, cap };
+}
+function capPolygon(pts, n) {
+  const u = [];
+  for (const p of pts) if (!u.some((q) => q.distanceToSquared(p) < 1e-11)) u.push(p);
+  if (u.length < 3) return null;
+  const cen = new THREE.Vector3(); u.forEach((p) => cen.add(p)); cen.multiplyScalar(1 / u.length);
+  const ax = Math.abs(n.x) < 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+  const e1 = new THREE.Vector3().crossVectors(ax, n).normalize();
+  const e2 = new THREE.Vector3().crossVectors(n, e1);
+  const sorted = u.map((p) => { _a.subVectors(p, cen); return { p, t: Math.atan2(_a.dot(e2), _a.dot(e1)) }; })
+    .sort((x, y) => x.t - y.t).map((x) => x.p);
+  const c = cleanPoly(sorted);
+  return c.length >= 3 ? c : null;
+}
+function volCen(faces) {
+  let vol = 0; const cen = new THREE.Vector3();
+  for (const f of faces) {
+    const a = f.v[0];
+    for (let i = 1; i < f.v.length - 1; i++) {
+      const b = f.v[i], c = f.v[i + 1];
+      const v = a.dot(_c.crossVectors(b, c)) / 6;
+      vol += v;
+      cen.x += v * (a.x + b.x + c.x) / 4; cen.y += v * (a.y + b.y + c.y) / 4; cen.z += v * (a.z + b.z + c.z) / 4;
+    }
+  }
+  if (vol > 1e-12) cen.multiplyScalar(1 / vol);
+  return { vol, cen };
+}
+function faceArea(f) {
+  let s = 0; const a = f.v[0];
+  for (let i = 1; i < f.v.length - 1; i++) { _a.subVectors(f.v[i], a); _b.subVectors(f.v[i + 1], a); s += _c.crossVectors(_a, _b).length() / 2; }
+  return s;
+}
+
+/* ---------- geometry & physics shapes ---------- */
+function buildGeometry(faces, c, k) {
+  let tris = 0, peelTris = 0;
+  for (const f of faces) { tris += f.v.length - 2; if (!f.cut) peelTris += f.v.length - 2; }
+  const pos = new Float32Array(tris * 9), nor = new Float32Array(tris * 9), uv = new Float32Array(tris * 6), ao = new Float32Array(tris * 9);
+  let t = 0;
+  const ik = 1 / k;
+  const push = (p, n, u, v) => {
+    pos[t * 3] = p.x - c.x; pos[t * 3 + 1] = p.y - c.y; pos[t * 3 + 2] = p.z - c.z;
+    nor[t * 3] = n.x; nor[t * 3 + 1] = n.y; nor[t * 3 + 2] = n.z;
+    ao[t * 3] = p.x * ik; ao[t * 3 + 1] = p.y * ik; ao[t * 3 + 2] = p.z * ik;
+    uv[t * 2] = u; uv[t * 2 + 1] = v; t++;
+  };
+  const sph = (p) => {
+    const d = p.dir || _a.copy(p).normalize();
+    return [Math.atan2(d.z, d.x) / (Math.PI * 2) + 0.5, 1 - Math.acos(THREE.MathUtils.clamp(d.y, -1, 1)) / Math.PI];
+  };
+  for (const f of faces) {
+    if (f.cut) continue;
+    for (let i = 1; i < f.v.length - 1; i++) {
+      const tri = [f.v[0], f.v[i], f.v[i + 1]];
+      const uvs = tri.map(sph);
+      const mx = Math.max(uvs[0][0], uvs[1][0], uvs[2][0]), mn = Math.min(uvs[0][0], uvs[1][0], uvs[2][0]);
+      if (mx - mn > 0.5) uvs.forEach((q) => { if (q[0] < 0.5) q[0] += 1; });
+      for (let j = 0; j < 3; j++) push(tri[j], tri[j].nn || _b.copy(tri[j]).normalize(), uvs[j][0], uvs[j][1]);
+    }
+  }
+  for (const f of faces) if (f.cut) for (let i = 1; i < f.v.length - 1; i++) for (const p of [f.v[0], f.v[i], f.v[i + 1]]) push(p, f.n, 0, 0);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  g.setAttribute('aOrange', new THREE.BufferAttribute(ao, 3));
+  g.addGroup(0, peelTris * 3, 0);
+  g.addGroup(peelTris * 3, (tris - peelTris) * 3, 1);
+  g.computeBoundingSphere();
+  return g;
+}
+function hullData(faces, c) {
+  const verts = [], idxFaces = [], map = new Map();
+  const key = (p) => `${Math.round(p.x * 2e4)},${Math.round(p.y * 2e4)},${Math.round(p.z * 2e4)}`;
+  for (const f of faces) {
+    const idx = [];
+    for (const p of f.v) {
+      const k = key(p);
+      let i = map.get(k);
+      if (i === undefined) { i = verts.length; map.set(k, i); verts.push([p.x - c.x, p.y - c.y, p.z - c.z]); }
+      if (!idx.includes(i)) idx.push(i);
+    }
+    if (idx.length < 3) continue;
+    let ok = false;
+    for (let r = 0; r < idx.length && !ok; r++) {
+      const A = verts[idx[0]], B = verts[idx[1]], C = verts[idx[2]];
+      _a.set(B[0] - A[0], B[1] - A[1], B[2] - A[2]); _b.set(C[0] - A[0], C[1] - A[1], C[2] - A[2]);
+      if (_c.crossVectors(_a, _b).lengthSq() > 1e-12) ok = true; else idx.push(idx.shift());
+    }
+    if (ok) idxFaces.push(idx);
+  }
+  if (verts.length < 4 || idxFaces.length < 4) return null;
+  return { verts, faces: idxFaces };
+}
+function hullShape(h) {
+  return new CANNON.ConvexPolyhedron({ vertices: h.verts.map((v) => new CANNON.Vec3(v[0], v[1], v[2])), faces: h.faces.map((f) => f.slice()) });
+}
+
+/* ---------- physics world ---------- */
+const G_STATIC = 1, G_PIECE = 2;
+const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -G_REAL, 0) });
+world.broadphase = new CANNON.SAPBroadphase(world);
+world.allowSleep = true;
+world.solver.iterations = 14;
+const fruitMat = new CANNON.Material('fruit'), groundMat = new CANNON.Material('ground');
+const STIFF = { contactEquationStiffness: 5e7, contactEquationRelaxation: 3, frictionEquationStiffness: 5e7, frictionEquationRelaxation: 3 };
+const cmFruit = new CANNON.ContactMaterial(fruitMat, fruitMat, { friction: 0.6, restitution: 0.05, contactEquationStiffness: 1e7, contactEquationRelaxation: 4, frictionEquationStiffness: 1e7, frictionEquationRelaxation: 4 });
+const cmGround = new CANNON.ContactMaterial(fruitMat, groundMat, { friction: 0.75, restitution: 0.08, ...STIFF });
+world.addContactMaterial(cmFruit); world.addContactMaterial(cmGround);
+let groundBody;
+const WALL = 9;
+function addStatic(pos, quat) {
+  const b = new CANNON.Body({ mass: 0, material: groundMat, collisionFilterGroup: G_STATIC, collisionFilterMask: -1 });
+  b.addShape(new CANNON.Plane()); b.position.copy(pos); b.quaternion.copy(quat); world.addBody(b);
+  return b;
+}
+{
+  const q = new CANNON.Quaternion(); q.setFromEuler(-Math.PI / 2, 0, 0);
+  groundBody = addStatic(new CANNON.Vec3(0, 0, 0), q);
+  for (const [x, z, ry] of [[WALL, 0, -Math.PI / 2], [-WALL, 0, Math.PI / 2], [0, WALL, Math.PI], [0, -WALL, 0]]) {
+    const wq = new CANNON.Quaternion(); wq.setFromEuler(0, ry, 0);
+    addStatic(new CANNON.Vec3(x, 0, z), wq);
+  }
+}
+function applySoftness() {
+  cmFruit.restitution = 0.02 + 0.14 * state.firm;
+  cmGround.restitution = 0.02 + 0.2 * state.firm;
+}
+// hand tool: steer the held piece toward the cursor every physics step, without spin
+// The piece also swings a little: it leans back against the direction it is carried
+// and tips toward the spot you are holding it by, then settles when you stop.
+const _qDes = new THREE.Quaternion(), _qCur = new THREE.Quaternion(), _qT = new THREE.Quaternion(), _ax = new THREE.Vector3(), _hv = new THREE.Vector3();
+world.addEventListener('preStep', () => {
+  if (!drag || drag.kind !== 'grab' || !drag.active) return;
+  const b = drag.piece.body, p = drag.piece;
+  const dx = drag.target.x - b.position.x, dy = drag.target.y - b.position.y, dz = drag.target.z - b.position.z;
+  const gain = 14, max = 40;
+  let vx = dx * gain, vy = dy * gain, vz = dz * gain;
+  const sp = Math.hypot(vx, vy, vz); if (sp > max) { vx *= max / sp; vy *= max / sp; vz *= max / sp; }
+  b.velocity.set(vx, vy, vz);
+  _hv.set(vx, 0, vz);
+  drag.vs.lerp(_hv, 0.06);
+  _qDes.copy(drag.qBase);
+  const lift = THREE.MathUtils.clamp((b.position.y - drag.y0) / Math.max(p.radius, 0.3), 0, 1);
+  if (drag.grabOff.lengthSq() > 1e-4) {
+    _ax.crossVectors(drag.grabOff, UP).normalize();
+    _qT.setFromAxisAngle(_ax, Math.min(drag.grabOff.length() / Math.max(p.radius, 0.3), 1) * 0.35 * lift);
+    _qDes.premultiply(_qT);
+  }
+  const hs = drag.vs.length() / Math.sqrt(Math.max(p.k, 0.4));
+  if (hs > 0.05) {
+    _ax.crossVectors(UP, drag.vs).normalize();
+    _qT.setFromAxisAngle(_ax, Math.min(hs * 0.03, 0.5));
+    _qDes.premultiply(_qT);
+  }
+  _qCur.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
+  _qT.copy(_qDes).multiply(_qCur.invert());
+  if (_qT.w < 0) { _qT.x = -_qT.x; _qT.y = -_qT.y; _qT.z = -_qT.z; _qT.w = -_qT.w; }
+  const ang = 2 * Math.acos(Math.min(1, _qT.w)), sn = Math.sqrt(Math.max(0, 1 - _qT.w * _qT.w));
+  if (sn > 1e-5) { const w = Math.min(ang * 9, 14) / sn; b.angularVelocity.set(_qT.x * w, _qT.y * w, _qT.z * w); }
+  else b.angularVelocity.set(0, 0, 0);
+  b.wakeUp();
+});
+// Real fruit is soft, so it does not roll forever: anything touching the table gets rolling
+// resistance, and pieces that are almost at rest settle instead of rocking on hull edges.
+const onTable = new Set();
+world.addEventListener('postStep', () => {
+  onTable.clear();
+  for (const c of world.contacts) { onTable.add(c.bi); onTable.add(c.bj); }
+  for (const p of pieces) {
+    if (!p.landed || (drag && drag.piece === p)) continue;
+    const b = p.body;
+    if (b.sleepState === CANNON.Body.SLEEPING) continue;
+    if (onTable.has(b)) {
+      b.angularVelocity.scale(0.955, b.angularVelocity);
+      b.velocity.x *= 0.975; b.velocity.z *= 0.975;
+    }
+    const kk = Math.max(p.k, 0.5);
+    const v2 = b.velocity.lengthSquared() / (kk * kk), w2 = b.angularVelocity.lengthSquared();
+    if (v2 < 1.2 && w2 < 3) { b.velocity.scale(0.9, b.velocity); b.angularVelocity.scale(0.85, b.angularVelocity); }
+    if (v2 < 0.02 && w2 < 0.05) b.sleep();
+  }
+});
+
+/* ---------- pieces ---------- */
+const pieces = [], stains = [];
+const R_DETAIL = 9, P_DETAIL = 1, P_SCALE = 1.03;
+let pieceSerial = 0, originSerial = 0;
+const outlineMat = new THREE.MeshBasicMaterial({ color: 0x23201c, side: THREE.BackSide });
+const templates = {};
+function fruitScale(key) {
+  const real = FRUITS[key].mmPerUnit / MM_PER_UNIT;
+  return state.mode === 'arcade' ? THREE.MathUtils.clamp(real, 0.8, 1.45) : real;
+}
+function getTemplate(key, k) {
+  const id = `${key}|${k.toFixed(3)}`;
+  if (templates[id]) return templates[id];
+  const f = FRUITS[key];
+  const rF = fruitFaces(f, R_DETAIL, k, true), pF = fruitFaces(f, P_DETAIL, k * P_SCALE, false);
+  const { vol, cen } = volCen(rF);
+  let radius = 0; for (const fc of rF) for (const p of fc.v) radius = Math.max(radius, p.distanceTo(cen));
+  let peelArea = 0; for (const fc of rF) peelArea += faceArea(fc);
+  return (templates[id] = { key, k, rF, pF, vol, cen, radius, peelArea, geo: buildGeometry(rF, cen, k), hull: hullData(pF, cen) });
+}
+function pieceMask() { return state.mode === 'arcade' ? G_STATIC : G_STATIC | G_PIECE; }
+function makePiece(spec) {
+  const { fruit, k, q, T, vel, ang, whole, origin, fullVol } = spec;
+  let rFaces, pFaces, vol, cen, geo, hull, radius, cutArea = 0, peelArea = 0, shared = false;
+  if (spec.tmpl) {
+    const t = spec.tmpl;
+    ({ rF: rFaces, pF: pFaces, vol, cen, geo, hull, radius, peelArea } = t);
+    shared = true;
+  } else {
+    rFaces = spec.rFaces; pFaces = spec.pFaces;
+    ({ vol, cen } = volCen(rFaces));
+    if (vol <= 0 || volCen(pFaces).vol <= 0) return null;
+    hull = hullData(pFaces, cen);
+    if (!hull) return null;
+    geo = buildGeometry(rFaces, cen, k);
+    radius = 0;
+    for (const fc of rFaces) {
+      for (const p of fc.v) radius = Math.max(radius, p.distanceTo(cen));
+      if (fc.cut) cutArea += faceArea(fc); else peelArea += faceArea(fc);
+    }
+  }
+  const mesh = new THREE.Mesh(geo, getMats(fruit).list);
+  mesh.castShadow = true; mesh.receiveShadow = true; mesh.matrixAutoUpdate = false;
+  scene.add(mesh);
+  const body = new CANNON.Body({
+    mass: Math.max(vol * FRUITS[fruit].density, 0.002), material: fruitMat,
+    linearDamping: 0.08, angularDamping: 0.3,
+    collisionFilterGroup: G_PIECE, collisionFilterMask: pieceMask(),
+  });
+  body.addShape(hullShape(hull));
+  const wc = cen.clone().applyQuaternion(q).add(T);
+  body.position.set(wc.x, wc.y, wc.z);
+  body.quaternion.set(q.x, q.y, q.z, q.w);
+  if (vel) body.velocity.set(vel.x, vel.y, vel.z);
+  if (ang) body.angularVelocity.set(ang.x, ang.y, ang.z);
+  body.sleepSpeedLimit = 0.25 * Math.max(k, 0.6); body.sleepTimeLimit = 0.35;
+  world.addBody(body);
+  const piece = {
+    id: ++pieceSerial, fruit, k, origin, fullVol, mesh, body, rFaces, pFaces, c: cen, vol, radius, cutArea, peelArea, shared,
+    s: 0, sv: 0, born: now(), whole: !!whole, landed: false, fade: 1, dying: false,
+  };
+  mesh.userData.piece = piece;
+  body.addEventListener('collide', (e) => {
+    // a resting piece touches the table every step, so only count real impacts
+    const v = Math.abs(e.contact.getImpactVelocityAlongNormal()) / Math.sqrt(Math.max(piece.k, 0.3));
+    const tNow = now();
+    if (e.body === groundBody && !piece.landed) {
+      if (piece.whole && state.mode === 'arcade' && state.arc.running) state.arc.dropped++;
+      piece.landed = true;
+    }
+    if (v < 5 || tNow - (piece.lastHit || -1) < 0.15) return;
+    piece.lastHit = tNow;
+    piece.sv -= Math.min(v - 4, 12) * 0.016 * (1.25 - state.firm);
+    if (e.body === groundBody) sfx.thud(Math.min(v / 25, 1) * Math.min(piece.vol / 2, 1));
+  });
+  pieces.push(piece);
+  return piece;
+}
+function removePiece(p) {
+  if (state.selected === p) deselect();
+  if (drag && drag.piece === p) { drag = null; canvas.classList.remove('grabbing'); }
+  scene.remove(p.mesh); if (!p.shared) p.mesh.geometry.dispose(); world.removeBody(p.body);
+  const i = pieces.indexOf(p); if (i >= 0) pieces.splice(i, 1);
+  if (p.tag) { p.tag.remove(); p.tag = null; }
+}
+function clearTable() {
+  endDrag();
+  for (const p of [...pieces]) removePiece(p);
+  for (const s of stains) { scene.remove(s.mesh); s.mesh.geometry.dispose(); s.mesh.material.dispose(); }
+  stains.length = 0;
+  particles.clear();
+  state.cuts = 0;
+  knife.active = false; knife.group.visible = false;
+  hidePreview();
+}
+function spawnFruit(key, opts = {}) {
+  const f = FRUITS[key], k = fruitScale(key), tmpl = getTemplate(key, k);
+  const q = new THREE.Quaternion();
+  const yaw = opts.yaw ?? Math.random() * 6.28;
+  if (f.lie) q.setFromEuler(new THREE.Euler(0, yaw, Math.PI / 2 + 0.04));
+  else q.setFromEuler(new THREE.Euler(0.32, yaw, 0.06));
+  let T;
+  if (opts.pos) T = opts.pos.clone();
+  else {
+    let minY = Infinity;
+    for (const fc of tmpl.pF) for (const p of fc.v) minY = Math.min(minY, _a.copy(p).applyQuaternion(q).y);
+    const xz = opts.xz || new THREE.Vector2(0.25, 0);
+    T = new THREE.Vector3(xz.x, -minY + (reduceMotion ? 0.02 : 0.6 * k + 0.4), xz.y);
+  }
+  const ang = opts.ang ?? null;
+  return makePiece({ fruit: key, k, tmpl, q, T, vel: opts.vel || null, ang, whole: true, origin: ++originSerial, fullVol: tmpl.vol });
+}
+function originsOnTable() { return new Set(pieces.map((p) => p.origin)); }
+function findSpot(radius) {
+  if (!pieces.length) return new THREE.Vector2(0, 0);
+  for (let tries = 0; tries < 80; tries++) {
+    const r = Math.sqrt(Math.random()) * Math.min(1.2 + tries * 0.08, WALL - radius - 0.6), a = Math.random() * Math.PI * 2;
+    const x = Math.cos(a) * r, z = Math.sin(a) * r * 0.75;
+    if (pieces.every((p) => Math.hypot(p.body.position.x - x, p.body.position.z - z) > (p.radius + radius) * 1.05)) return new THREE.Vector2(x, z);
+  }
+  return null;
+}
+function addFruit(key) {
+  if (originsOnTable().size >= MAX_ORIGINS) { toast(`The table holds ${MAX_ORIGINS} fruits. Clear it to add more.`); return; }
+  const tmpl = getTemplate(key, fruitScale(key));
+  const xz = findSpot(tmpl.radius);
+  if (!xz) { toast('No room left on the table. Clear it or move pieces aside.'); return; }
+  spawnFruit(key, { xz });
+  state.fruit = key;
+  state.autoZoom = true;
+  updateStats(); updateTitle();
+}
+function resetTable() {
+  clearTable();
+  spawnFruit(state.fruit, { yaw: 0.4 });
+  state.autoZoom = true;
+  updateStats(); updateTitle();
+}
+
+/* ---------- cutting ---------- */
+const UP = new THREE.Vector3(0, 1, 0);
+function pieceFrame(p) {
+  const b = p.body;
+  const q = new THREE.Quaternion(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
+  const t = new THREE.Vector3(b.position.x, b.position.y, b.position.z);
+  return { q, t };
+}
+function localPlane(p, nW, dW, fr) {
+  const nO = nW.clone().applyQuaternion(fr.q.clone().invert()).normalize();
+  return { nO, dO: dW - nW.dot(fr.t) + nO.dot(p.c) };
+}
+function tryCut(p, nW, dW, inRange, impulse, out) {
+  const fr = pieceFrame(p), { q, t } = fr;
+  if (Math.abs(nW.dot(t) - dW) > p.radius) return false;
+  const { nO, dO } = localPlane(p, nW, dW, fr);
+  const rc = clipPoly(p.rFaces, nO, dO);
+  const capR = capPolygon(rc.cap, nO);
+  if (!capR || !rc.back.length || !rc.front.length) return false;
+  const capW = capR.map((cp) => cp.clone().sub(p.c).applyQuaternion(q).add(t));
+  if (!inRange(capW)) return false;
+  const pc = clipPoly(p.pFaces, nO, dO);
+  const capP = capPolygon(pc.cap, nO);
+  if (!capP || !pc.back.length || !pc.front.length) return false;
+
+  const mk = (arr, pts, sign) => arr.concat([{ v: sign > 0 ? pts.slice() : pts.slice().reverse(), cut: true, n: nO.clone().multiplyScalar(sign) }]);
+  const rBack = mk(rc.back, capR, 1), rFront = mk(rc.front, capR, -1);
+  const pBack = mk(pc.back, capP, 1), pFront = mk(pc.front, capP, -1);
+  const minVol = p.fullVol * 0.0035;
+  if (volCen(rBack).vol < minVol || volCen(rFront).vol < minVol) return false;
+  if (volCen(pBack).vol < minVol * 0.3 || volCen(pFront).vol < minVol * 0.3) return false;
+
+  const T = t.clone().sub(p.c.clone().applyQuaternion(q));
+  const b = p.body;
+  const v0 = new THREE.Vector3(b.velocity.x, b.velocity.y, b.velocity.z);
+  const w0 = new THREE.Vector3(b.angularVelocity.x, b.angularVelocity.y, b.angularVelocity.z);
+  const spinAxis = new THREE.Vector3().crossVectors(UP, nW);
+  if (spinAxis.lengthSq() < 0.05) spinAxis.set(Math.random() - 0.5, 0, Math.random() - 0.5);
+  spinAxis.normalize().multiplyScalar((4 + Math.random()) / Math.sqrt(Math.max(p.k, 0.5)));
+  const created = [];
+  for (const [rf, pf, sgn] of [[rBack, pBack, -1], [rFront, pFront, 1]]) {
+    const vel = v0.clone().addScaledVector(nW, impulse * sgn).add(new THREE.Vector3(0, 0.6, 0));
+    const np = makePiece({ fruit: p.fruit, k: p.k, rFaces: rf, pFaces: pf, q, T, vel, ang: w0.clone().addScaledVector(spinAxis, sgn), whole: false, origin: p.origin, fullVol: p.fullVol });
+    if (np) { np.sv = -1.6 * (1.25 - state.firm); created.push(np); }
+  }
+  if (created.length < 2) { for (const c of created) removePiece(c); return false; }
+  const airborne = t.y > p.radius + 0.5;
+  removePiece(p);
+  const at = new THREE.Vector3(); capW.forEach((w) => at.add(w)); at.multiplyScalar(1 / capW.length);
+  out.push({ at, area: faceArea({ v: capR }), fruit: p.fruit, n: nW.clone(), airborne });
+  return true;
+}
+function performCut(nW, dW, inRange, impulse, prefilter) {
+  const hits = [];
+  for (const p of [...pieces]) {
+    if (p.dying) continue;
+    if (state.mode === 'arcade' && now() - p.born < 0.18) continue;
+    if (prefilter && !prefilter(p)) continue;
+    try { tryCut(p, nW, dW, inRange, impulse, hits); } catch (err) { console.warn('cut skipped', err); }
+  }
+  if (hits.length) {
+    for (const h of hits) {
+      if (state.mode !== 'arcade') addStain(h.at, h.area, h.fruit);
+      particles.burst(h.at, h.n, FRUITS[h.fruit].juice, Math.min(10 + Math.round(Math.sqrt(h.area) * 8), state.mode === 'arcade' ? 18 : 30));
+    }
+    sfx.slice(FRUITS[hits[0].fruit].kind, hits.length);
+    if (state.selected && !pieces.includes(state.selected)) deselect();
+  }
+  return hits;
+}
+function addStain(at, area, fruitKey) {
+  const mat = new THREE.MeshBasicMaterial({ map: stainTex, color: FRUITS[fruitKey].juice, transparent: true, opacity: 0.3, depthWrite: false });
+  const m = new THREE.Mesh(new THREE.CircleGeometry(1, 32), mat);
+  m.rotation.x = -Math.PI / 2; m.rotation.z = Math.random() * 6.28;
+  m.position.set(at.x + (Math.random() - 0.5) * 0.2, 0.003 + (stains.length % 40) * 0.0002, at.z + (Math.random() - 0.5) * 0.2);
+  m.scale.setScalar(0.01);
+  scene.add(m);
+  stains.push({ mesh: m, size: 0.35 + Math.sqrt(area) * 0.45, t: 0 });
+  while (stains.length > 30) { const s = stains.shift(); scene.remove(s.mesh); s.mesh.geometry.dispose(); s.mesh.material.dispose(); }
+}
+
+/* ---------- juice particles ---------- */
+const particles = (() => {
+  const MAX = 360;
+  const mesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.035, 6, 4), new THREE.MeshBasicMaterial(), MAX);
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  mesh.frustumCulled = false; mesh.count = 0;
+  const color = new THREE.Color();
+  for (let i = 0; i < MAX; i++) mesh.setColorAt(i, color.set(0xffffff));
+  scene.add(mesh);
+  const list = [];
+  const m = new THREE.Matrix4();
+  return {
+    burst(at, n, hex, count) {
+      color.set(hex);
+      const g = -world.gravity.y, up = Math.sqrt(2 * g * 0.6);
+      for (let i = 0; i < count; i++) {
+        if (list.length >= MAX) list.shift();
+        const side = Math.random() < 0.5 ? -1 : 1;
+        const v = new THREE.Vector3((Math.random() - 0.5) * up * 0.5, up * (0.4 + Math.random() * 0.8), (Math.random() - 0.5) * up * 0.5).addScaledVector(n, side * up * (0.2 + Math.random() * 0.5));
+        list.push({ p: at.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3)), v, life: 0.5 + Math.random() * 0.5, s: 0.5 + Math.random() * 1.2, c: color.clone() });
+      }
+    },
+    update(dt) {
+      const g = -world.gravity.y * 0.85;
+      let k = 0;
+      for (let i = list.length - 1; i >= 0; i--) {
+        const q = list[i];
+        q.life -= dt; q.v.y -= g * dt; q.p.addScaledVector(q.v, dt);
+        if (q.p.y < 0.03) { q.p.y = 0.03; q.v.set(0, 0, 0); q.life = Math.min(q.life, 0.25); }
+        if (q.life <= 0) list.splice(i, 1);
+      }
+      for (const q of list) {
+        const s = q.s * Math.min(1, q.life * 3);
+        m.makeScale(s, s, s); m.setPosition(q.p);
+        mesh.setMatrixAt(k, m); mesh.setColorAt(k, q.c); k++;
+      }
+      mesh.count = k;
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    },
+    clear() { list.length = 0; mesh.count = 0; },
+  };
+})();
+
+/* ---------- sound (Web Audio, synthesised, starts after first interaction) ---------- */
+// Each slice layers a fast blade swish, a crunch of tiny bursts (cells breaking) and a wet squelch.
+const SOUND_PROFILES = [
+  { pitch: 1.0, crunch: 7, wet: 1.0 },   // citrus
+  { pitch: 1.05, crunch: 3, wet: 1.1 },  // kiwi
+  { pitch: 0.8, crunch: 14, wet: 1.3 },  // watermelon
+  { pitch: 1.25, crunch: 12, wet: 0.4 }, // apple
+  { pitch: 0.9, crunch: 2, wet: 0.7 },   // avocado
+];
+const sfx = (() => {
+  let ctx = null, noise = null, out = null;
+  const last = {};
+  const ensure = () => {
+    if (ctx || !state.sound) return ctx;
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const len = ctx.sampleRate; noise = ctx.createBuffer(1, len, ctx.sampleRate);
+      const d = noise.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      out = ctx.createDynamicsCompressor(); out.threshold.value = -16; out.ratio.value = 4;
+      const master = ctx.createGain(); master.gain.value = 0.9;
+      out.connect(master).connect(ctx.destination);
+    } catch { ctx = null; }
+    return ctx;
+  };
+  const nz = (t0, dur, type, f0, f1, q, g0, attack = 0.003) => {
+    const src = ctx.createBufferSource(); src.buffer = noise;
+    const flt = ctx.createBiquadFilter(); flt.type = type; flt.Q.value = q;
+    flt.frequency.setValueAtTime(f0, t0); flt.frequency.exponentialRampToValueAtTime(Math.max(f1, 20), t0 + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(g0, t0 + attack); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(flt).connect(g).connect(out);
+    src.start(t0, Math.random() * 0.8, dur + 0.05);
+  };
+  const tone = (t0, dur, f0, f1, g0, type = 'sine') => {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(g0, t0 + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g).connect(out); o.start(t0); o.stop(t0 + dur + 0.02);
+  };
+  const ok = (key, ms) => {
+    if (!state.sound || !ensure()) return false;
+    const t = performance.now(); if (t - (last[key] || 0) < ms) return false;
+    last[key] = t; return true;
+  };
+  return {
+    unlock() { if (ensure() && ctx.state === 'suspended') ctx.resume(); },
+    slice(kind = 0, n = 1) {
+      if (!ok('slice', 45)) return;
+      const P = SOUND_PROFILES[kind] || SOUND_PROFILES[0], t = ctx.currentTime + 0.005;
+      nz(t, 0.08, 'bandpass', 2600 * P.pitch, 7500 * P.pitch, 0.9, 0.13, 0.008);
+      let ti = t + 0.01;
+      for (let i = 0; i < P.crunch; i++) {
+        ti += 0.004 + Math.random() * 0.01;
+        nz(ti, 0.01 + Math.random() * 0.012, 'bandpass', (1500 + Math.random() * 2800) * P.pitch, (1100 + Math.random() * 1400) * P.pitch, 3.5, (0.07 + Math.random() * 0.13) * (1 - (i / P.crunch) * 0.6), 0.001);
+      }
+      nz(t + 0.025, 0.2 * P.wet + 0.05, 'lowpass', 1500 * P.pitch, 200, 7, 0.2 * P.wet * Math.min(n, 2), 0.01);
+      if (n > 1) nz(t + 0.06, 0.15, 'lowpass', 1100, 180, 6, 0.12 * P.wet, 0.01);
+    },
+    board() {
+      if (!ok('board', 80)) return;
+      const t = ctx.currentTime + 0.005;
+      tone(t, 0.11, 210, 75, 0.28);
+      nz(t, 0.025, 'highpass', 2500, 1800, 0.7, 0.07, 0.001);
+    },
+    whoosh(speed) {
+      if (!ok('whoosh', 170)) return;
+      const t = ctx.currentTime + 0.005;
+      nz(t, 0.16, 'bandpass', 450, 2400, 1.1, Math.min(0.04 + speed * 0.025, 0.14), 0.03);
+    },
+    thud(k) {
+      if (!state.sound || !ctx || k < 0.06 || !ok('thud', 60)) return;
+      const t = ctx.currentTime + 0.005;
+      tone(t, 0.1, 150, 60, 0.22 * k);
+      nz(t, 0.08, 'lowpass', 500, 120, 1, 0.12 * k, 0.002);
+    },
+    ding(up = 1) {
+      if (!ok('ding', 100)) return;
+      const t = ctx.currentTime + 0.005;
+      tone(t, 0.32, 660 * up, 990 * up, 0.16, 'triangle');
+      tone(t + 0.07, 0.3, 990 * up, 1320 * up, 0.08, 'triangle');
+    },
+  };
+})();
+
+/* ---------- knife ---------- */
+function makeKnife() {
+  const g = new THREE.Group();
+  const s = new THREE.Shape();
+  s.moveTo(0, 0); s.lineTo(1.45, 0); s.quadraticCurveTo(2.15, 0.02, 2.48, 0.22);
+  s.quadraticCurveTo(2.12, 0.41, 1.7, 0.47); s.lineTo(0, 0.47); s.closePath();
+  const bladeGeo = new THREE.ExtrudeGeometry(s, { depth: 0.02, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 1, curveSegments: 18 });
+  bladeGeo.translate(0, 0, -0.01);
+  const steel = new THREE.MeshStandardMaterial({ color: 0xdfe2e5, metalness: 1, roughness: 0.26 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1f1c1a, roughness: 0.55 });
+  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.24, 0.13), dark); handle.position.set(-0.56, 0.31, 0);
+  const bolster = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.34, 0.07), steel); bolster.position.set(-0.05, 0.31, 0);
+  const parts = [new THREE.Mesh(bladeGeo, steel), handle, bolster];
+  for (const x of [-0.3, -0.56, -0.82]) {
+    const r = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.136, 12), steel);
+    r.rotation.x = Math.PI / 2; r.position.set(x, 0.31, 0); parts.push(r);
+  }
+  for (const p of parts) { p.castShadow = true; g.add(p); }
+  g.visible = false;
+  scene.add(g);
+  return { group: g, mats: [steel, dark], active: false, phase: 'down', t: 0, cutDone: false, hoverY: 2.05 };
+}
+const knife = makeKnife();
+function tableTop() { let h = 0; for (const p of pieces) h = Math.max(h, p.body.position.y + p.radius); return h; }
+function placeKnife(start, end, y) {
+  const L = new THREE.Vector3().subVectors(end, start); L.y = 0;
+  const len = L.length(); if (len < 1e-4) return;
+  L.multiplyScalar(1 / len);
+  const Z = new THREE.Vector3().crossVectors(L, UP);
+  const sc = THREE.MathUtils.clamp(len / 2.6, 0.72, 3);
+  knife.group.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(L, UP, Z));
+  knife.group.scale.setScalar(sc);
+  knife.group.position.copy(start).add(end).multiplyScalar(0.5).addScaledVector(L, -1.24 * sc);
+  knife.group.position.y = y;
+}
+function setKnifeOpacity(o) { for (const m of knife.mats) { m.opacity = o; m.transparent = o < 0.999; } }
+function cutPlaneFromLine(start, end) {
+  const L = new THREE.Vector3().subVectors(end, start); L.y = 0;
+  const len = L.length();
+  if (len < 0.35) return null;
+  L.multiplyScalar(1 / len);
+  const nW = new THREE.Vector3().crossVectors(L, UP).normalize();
+  return { L, len, nW, dW: nW.dot(start), start };
+}
+function lineInRange(pl) {
+  return (pts) => {
+    let a = Infinity, b = -Infinity;
+    for (const w of pts) { const s = _a.subVectors(w, pl.start).dot(pl.L); a = Math.min(a, s); b = Math.max(b, s); }
+    return !(b < -0.08 || a > pl.len + 0.08);
+  };
+}
+function releaseKnife(start, end) {
+  const pl = cutPlaneFromLine(start, end);
+  if (!pl) { knife.group.visible = false; return false; }
+  Object.assign(knife, { active: true, phase: 'down', t: 0, cutDone: false, start: start.clone(), end: end.clone(), pl, hoverY: tableTop() + 0.5 });
+  placeKnife(start, end, knife.hoverY);
+  knife.group.visible = true; setKnifeOpacity(1);
+  return true;
+}
+function knifeCut() {
+  const pl = knife.pl;
+  const hits = performCut(pl.nW, pl.dW, lineInRange(pl), 2.2);
+  if (hits.length) {
+    state.cuts++;
+    if (state.mode === 'challenge') onChallengeCut();
+    updateStats(); updateTitle();
+  }
+}
+function updateKnife(dt) {
+  if (!knife.active) return;
+  const k = knife, H = k.hoverY;
+  if (k.phase === 'down') {
+    k.t = Math.min(1, k.t + dt / 0.3);
+    const y = THREE.MathUtils.lerp(H, 0.0, k.t * k.t);
+    placeKnife(k.start, k.end, y);
+    if (!k.cutDone && y < H * 0.55) { k.cutDone = true; knifeCut(); }
+    if (k.t >= 1) { k.phase = 'hold'; k.t = 0; sfx.board(); }
+  } else if (k.phase === 'hold') {
+    k.t += dt / 0.2; if (k.t >= 1) { k.phase = 'up'; k.t = 0; }
+  } else {
+    k.t = Math.min(1, k.t + dt / 0.35);
+    placeKnife(k.start, k.end, THREE.MathUtils.lerp(0, H + 0.6, 1 - Math.pow(1 - k.t, 2)));
+    setKnifeOpacity(1 - k.t);
+    if (k.t >= 1) { k.active = false; knife.group.visible = false; }
+  }
+}
+
+/* ---------- cut preview: a sheet where the blade will travel + the exact cut outline on each piece ---------- */
+const preview = (() => {
+  const sheetGeo = new THREE.PlaneGeometry(1, 1); sheetGeo.translate(0.5, 0.5, 0);
+  const sheet = new THREE.Mesh(sheetGeo, new THREE.MeshBasicMaterial({ color: 0xe86a10, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+  sheet.renderOrder = 5; sheet.visible = false; scene.add(sheet);
+  const edgeGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0.004, 0), new THREE.Vector3(1, 0.004, 0)]);
+  const edge = new THREE.Line(edgeGeo, new THREE.LineBasicMaterial({ color: 0x23201c, transparent: true, opacity: 0.6 }));
+  edge.visible = false; scene.add(edge);
+  const loops = [];
+  const loopMat = new THREE.LineBasicMaterial({ color: 0xe86a10, depthTest: false, transparent: true, opacity: 0.95 });
+  const fillMat = new THREE.MeshBasicMaterial({ color: 0xff7a1a, depthTest: false, depthWrite: false, transparent: true, opacity: 0.38, side: THREE.DoubleSide, toneMapped: false });
+  function loop(i) {
+    if (loops[i]) return loops[i];
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(600 * 3), 3));
+    const a = new THREE.LineLoop(g, loopMat);
+    a.renderOrder = 11; a.frustumCulled = false;
+    const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(600 * 9), 3));
+    const fillMesh = new THREE.Mesh(fg, fillMat);
+    fillMesh.renderOrder = 10; fillMesh.frustumCulled = false;
+    scene.add(fillMesh); scene.add(a);
+    return (loops[i] = { a, g, fill: fillMesh, fg, tag: null });
+  }
+  return { sheet, edge, loop, loops, last: 0 };
+})();
+function hidePreview() {
+  preview.sheet.visible = preview.edge.visible = false;
+  for (const l of preview.loops) { l.a.visible = l.fill.visible = false; if (l.tag) l.tag.hidden = true; }
+}
+function updatePreview(start, end, force) {
+  const tNow = performance.now();
+  if (!force && tNow - preview.last < 45) return;
+  preview.last = tNow;
+  const pl = cutPlaneFromLine(start, end);
+  if (!pl || state.locked) { hidePreview(); return; }
+  const H = tableTop() + 0.3;
+  const ang = Math.atan2(pl.L.z, pl.L.x);
+  preview.sheet.position.copy(start).setY(0); preview.sheet.rotation.set(0, -ang, 0); preview.sheet.scale.set(pl.len, H, 1); preview.sheet.visible = true;
+  preview.edge.position.copy(start).setY(0); preview.edge.rotation.set(0, -ang, 0); preview.edge.scale.set(pl.len, 1, 1); preview.edge.visible = true;
+  const inRange = lineInRange(pl);
+  let li = 0;
+  for (const p of pieces) {
+    if (li >= 16) break;
+    const fr = pieceFrame(p);
+    if (Math.abs(pl.nW.dot(fr.t) - pl.dW) > p.radius) continue;
+    const { nO, dO } = localPlane(p, pl.nW, pl.dW, fr);
+    const rc = clipPoly(p.rFaces, nO, dO, true);
+    const cap = capPolygon(rc.cap, nO);
+    if (!cap || !rc.back.length) continue;
+    const capW = cap.map((cp) => cp.clone().sub(p.c).applyQuaternion(fr.q).add(fr.t));
+    if (!inRange(capW)) continue;
+    const backVol = volCen(rc.back.concat([{ v: cap, cut: true, n: nO }])).vol;
+    if (backVol <= p.vol * 0.002 || backVol >= p.vol * 0.998) continue;
+    const L = preview.loop(li++);
+    const arr = L.g.attributes.position.array, n = Math.min(capW.length, 600);
+    const cen = new THREE.Vector3();
+    for (let i = 0; i < n; i++) { arr[i * 3] = capW[i].x; arr[i * 3 + 1] = capW[i].y; arr[i * 3 + 2] = capW[i].z; cen.add(capW[i]); }
+    cen.multiplyScalar(1 / n);
+    L.g.attributes.position.needsUpdate = true; L.g.setDrawRange(0, n);
+    const fa = L.fg.attributes.position.array;
+    for (let i = 1; i < n - 1; i++) {
+      const o = (i - 1) * 9;
+      fa[o] = capW[0].x; fa[o + 1] = capW[0].y; fa[o + 2] = capW[0].z;
+      fa[o + 3] = capW[i].x; fa[o + 4] = capW[i].y; fa[o + 5] = capW[i].z;
+      fa[o + 6] = capW[i + 1].x; fa[o + 7] = capW[i + 1].y; fa[o + 8] = capW[i + 1].z;
+    }
+    L.fg.attributes.position.needsUpdate = true; L.fg.setDrawRange(0, Math.max(0, (n - 2) * 3));
+    L.a.visible = L.fill.visible = true;
+    if (state.mode === 'free') {
+      if (!L.tag) { L.tag = document.createElement('div'); L.tag.className = 'tag preview'; $('labels').appendChild(L.tag); }
+      const s1 = backVol / p.fullVol, s2 = (p.vol - backVol) / p.fullVol;
+      const f = (x) => fmt(x * 100, x < 0.1 ? 1 : 0);
+      L.tag.innerHTML = `${f(s1)} %<em>|</em>${f(s2)} %`;
+      let topY = -Infinity; for (const w of capW) topY = Math.max(topY, w.y);
+      const s = projectToScreen(_b.set(cen.x, topY + 0.15, cen.z));
+      L.tag.style.left = `${s.x - viewRect.left}px`; L.tag.style.top = `${s.y - viewRect.top}px`;
+      L.tag.hidden = false;
+    } else if (L.tag) L.tag.hidden = true;
+  }
+  for (let i = li; i < preview.loops.length; i++) { const L = preview.loops[i]; L.a.visible = L.fill.visible = false; if (L.tag) L.tag.hidden = true; }
+}
+
+/* ---------- arcade swipe cutting (screen-space plane) ---------- */
+const trail = [];
+function screenToWorldOnRay(x, y, dist) {
+  ndc.set(((x - viewRect.left) / viewRect.width) * 2 - 1, -((y - viewRect.top) / viewRect.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  return ray.ray.origin.clone().addScaledVector(ray.ray.direction, dist);
+}
+const _pv = new THREE.Vector3();
+function projectToScreen(w) {
+  _pv.copy(w).project(camera);
+  return { x: viewRect.left + (_pv.x * 0.5 + 0.5) * viewRect.width, y: viewRect.top + (-_pv.y * 0.5 + 0.5) * viewRect.height, z: _pv.z };
+}
+let swipeHits = 0;
+function swipeCut(a, b) {
+  const C = camera.position;
+  const A = screenToWorldOnRay(a.x, a.y, orbit.r), B = screenToWorldOnRay(b.x, b.y, orbit.r);
+  const nW = new THREE.Vector3().crossVectors(_a.subVectors(A, C), _b.subVectors(B, C)).normalize();
+  if (!isFinite(nW.x)) return;
+  const dW = nW.dot(C);
+  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy), ux = dx / len, uy = dy / len;
+  const focal = viewRect.height / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const cpos = new THREE.Vector3();
+  const prefilter = (p) => {
+    cpos.set(p.body.position.x, p.body.position.y, p.body.position.z);
+    const sr = p.radius * focal / Math.max(cpos.distanceTo(C), 0.1) + 8;
+    const s = projectToScreen(cpos);
+    const t = THREE.MathUtils.clamp((s.x - a.x) * ux + (s.y - a.y) * uy, 0, len);
+    return Math.hypot(a.x + ux * t - s.x, a.y + uy * t - s.y) < sr;
+  };
+  const inRange = (pts) => {
+    let lo = Infinity, hi = -Infinity;
+    for (const w of pts) { const s = projectToScreen(w); const t = (s.x - a.x) * ux + (s.y - a.y) * uy; lo = Math.min(lo, t); hi = Math.max(hi, t); }
+    return !(hi < -6 || lo > len + 6);
+  };
+  const hits = performCut(nW, dW, inRange, 2.2, prefilter);
+  for (const h of hits) {
+    const pts = h.airborne ? 2 : 1;
+    state.arc.score += pts; state.arc.splits++;
+    swipeHits++;
+    const s = projectToScreen(h.at);
+    popText(`+${pts}`, s.x, s.y, false);
+  }
+  if (hits.length) updateHud();
+}
+function endSwipe() {
+  if (swipeHits >= 3 && state.arc.running) {
+    state.arc.score += swipeHits; state.arc.bestCombo = Math.max(state.arc.bestCombo, swipeHits);
+    const last = trail[trail.length - 1];
+    if (last) popText(`Combo ×${swipeHits}`, last.x, last.y - 40, true);
+    sfx.ding(1 + Math.min(swipeHits, 6) * 0.08);
+    updateHud();
+  }
+  swipeHits = 0;
+}
+function popText(text, x, y, combo) {
+  if ($('labels').childElementCount > 40) return;
+  const d = document.createElement('div');
+  d.className = 'pop' + (combo ? ' combo' : '');
+  d.textContent = text;
+  d.style.left = `${x - viewRect.left}px`; d.style.top = `${y - viewRect.top}px`;
+  $('labels').appendChild(d);
+  setTimeout(() => d.remove(), 950);
+}
+let toastTimer = 0;
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2600);
+}
+
+/* ---------- input ---------- */
+const ray = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+function setNdc(e) {
+  ndc.set(((e.clientX - viewRect.left) / viewRect.width) * 2 - 1, -((e.clientY - viewRect.top) / viewRect.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+}
+function rayToHeight(h) {
+  const d = ray.ray.direction, o = ray.ray.origin;
+  if (Math.abs(d.y) < 1e-5) return null;
+  const t = (h - o.y) / d.y; if (t <= 0) return null;
+  return o.clone().addScaledVector(d, t);
+}
+function pickPiece() {
+  const hit = ray.intersectObjects(pieces.map((p) => p.mesh), false)[0];
+  return hit ? { piece: hit.object.userData.piece, point: hit.point } : null;
+}
+function lineHeight() {
+  if (!pieces.length) return 0.55;
+  let s = 0; for (const p of pieces) s += p.body.position.y;
+  return THREE.MathUtils.clamp(s / pieces.length, 0.3, 3);
+}
+let drag = null;
+function endDrag() {
+  if (drag && drag.kind === 'grab' && drag.active) {
+    const b = drag.piece.body;
+    const sp = b.velocity.length(), max = 8;
+    if (sp > max) b.velocity.scale(max / sp, b.velocity);
+  }
+  drag = null; canvas.classList.remove('grabbing');
+  if (state.mode !== 'arcade') clearInk();
+  hidePreview();
+}
+function guard(fn) { return (e) => { try { fn(e); } catch (err) { console.error(err); drag = null; hidePreview(); } }; }
+canvas.addEventListener('pointerdown', guard((e) => {
+  if (e.button !== 0 && e.pointerType === 'mouse') return;
+  sfx.unlock();
+  canvas.setPointerCapture(e.pointerId);
+  setNdc(e);
+  const t0 = { x: e.clientX, y: e.clientY, time: performance.now() };
+  if (state.mode === 'arcade') {
+    trail.length = 0; trail.push({ x: e.clientX, y: e.clientY, t: performance.now() });
+    drag = { kind: 'swipe', t0, anchor: 0 };
+    swipeHits = 0;
+    return;
+  }
+  if (state.tool === 'knife') {
+    if (knife.active && knife.phase === 'down') return;
+    const h = lineHeight();
+    const p = rayToHeight(h);
+    if (!p) return;
+    knife.active = false;
+    drag = { kind: 'line', t0, h, sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, start: p, end: p.clone() };
+  } else {
+    const hit = pickPiece();
+    if (hit) {
+      const b = hit.piece.body;
+      drag = {
+        kind: 'grab', t0, piece: hit.piece, active: false, h: b.position.y + 0.35 + hit.piece.radius * 0.4, y0: b.position.y,
+        target: new THREE.Vector3(b.position.x, b.position.y, b.position.z), grabOff: new THREE.Vector3(hit.point.x - b.position.x, 0, hit.point.z - b.position.z),
+        qBase: new THREE.Quaternion(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w), vs: new THREE.Vector3(),
+      };
+      canvas.classList.add('grabbing');
+      b.wakeUp();
+    } else drag = { kind: 'orbit', t0, x: e.clientX, y: e.clientY };
+  }
+}));
+canvas.addEventListener('pointermove', guard((e) => {
+  if (!drag) return;
+  setNdc(e);
+  const moved = Math.hypot(e.clientX - drag.t0.x, e.clientY - drag.t0.y) > 6;
+  if (drag.kind === 'swipe') {
+    const prev = trail[trail.length - 1];
+    trail.push({ x: e.clientX, y: e.clientY, t: performance.now() });
+    if (prev) { const speed = Math.hypot(e.clientX - prev.x, e.clientY - prev.y) / Math.max(1, performance.now() - prev.t); if (speed > 1.4) sfx.whoosh(speed); }
+    const a = trail[drag.anchor], b = trail[trail.length - 1];
+    if (a && Math.hypot(b.x - a.x, b.y - a.y) > 28) { swipeCut(a, b); drag.anchor = trail.length - 1; }
+  } else if (drag.kind === 'line') {
+    const p = rayToHeight(drag.h);
+    drag.x = e.clientX; drag.y = e.clientY;
+    if (p) drag.end = p;
+    drawLine();
+    if (state.locked) return;
+    updatePreview(drag.start, drag.end);
+  } else if (drag.kind === 'grab') {
+    if (!drag.active && moved) drag.active = true;
+    if (drag.active) {
+      const p = rayToHeight(drag.h);
+      if (p) {
+        p.sub(drag.grabOff);
+        const lim = WALL - drag.piece.radius - 0.1;
+        drag.target.set(THREE.MathUtils.clamp(p.x, -lim, lim), drag.h, THREE.MathUtils.clamp(p.z, -lim, lim));
+      }
+    }
+  } else if (drag.kind === 'orbit') {
+    orbit.az -= (e.clientX - drag.x) * 0.006;
+    orbit.el = THREE.MathUtils.clamp(orbit.el + (e.clientY - drag.y) * 0.004, 0.18, 1.4);
+    drag.x = e.clientX; drag.y = e.clientY;
+    updateCamera();
+  }
+}));
+function isTap(e) { return drag && Math.hypot(e.clientX - drag.t0.x, e.clientY - drag.t0.y) < 6 && performance.now() - drag.t0.time < 450; }
+const finish = guard((e) => {
+  if (!drag) return;
+  if (drag.kind === 'swipe') { endSwipe(); drag = null; return; }
+  const tap = e.type === 'pointerup' && isTap(e);
+  if (tap) {
+    setNdc(e);
+    const hit = pickPiece();
+    if (drag.kind === 'line') knife.group.visible = knife.active;
+    endDrag();
+    if (hit) select(hit.piece); else deselect();
+    return;
+  }
+  if (drag.kind === 'line') {
+    const { start, end } = drag; drag = null; clearInk(); hidePreview();
+    if (!state.locked) releaseKnife(start, end); else knife.group.visible = false;
+    return;
+  }
+  endDrag();
+});
+canvas.addEventListener('pointerup', finish);
+canvas.addEventListener('pointercancel', finish);
+canvas.addEventListener('wheel', guard((e) => {
+  e.preventDefault();
+  if (state.mode === 'arcade') return;
+  if (drag && drag.kind === 'grab') {
+    _qT.setFromAxisAngle(UP, Math.sign(e.deltaY) * Math.PI / 12);
+    drag.qBase.premultiply(_qT);
+    drag.grabOff.applyQuaternion(_qT);
+    if (!drag.active) drag.active = true;
+    drag.piece.body.wakeUp();
+    return;
+  }
+  state.autoZoom = false;
+  orbit.rGoal = THREE.MathUtils.clamp(orbit.rGoal * (1 + Math.sign(e.deltaY) * 0.08), 6, 40);
+}), { passive: false });
+
+let inkDirty = false;
+function clearInk() { ictx.clearRect(0, 0, ink.width, ink.height); }
+function inkDpr() { return ink.width / viewRect.width; }
+function drawLine() {
+  clearInk();
+  if (!drag || drag.kind !== 'line') return;
+  const r = viewRect, d = inkDpr();
+  const ax = (drag.sx - r.left) * d, ay = (drag.sy - r.top) * d, bx = (drag.x - r.left) * d, by = (drag.y - r.top) * d;
+  ictx.save();
+  ictx.fillStyle = '#23201c';
+  for (const [x, y] of [[ax, ay], [bx, by]]) { ictx.beginPath(); ictx.arc(x, y, 3.5 * d, 0, Math.PI * 2); ictx.fill(); }
+  const mm = Math.round(drag.start.distanceTo(drag.end) * MM_PER_UNIT);
+  ictx.font = `700 ${12 * d}px "Bricolage Grotesque", system-ui, sans-serif`;
+  ictx.fillStyle = 'rgba(35,32,28,0.9)';
+  ictx.fillText(state.locked ? 'No cuts left' : `${mm} mm`, bx + 12 * d, by - 12 * d);
+  ictx.restore();
+}
+function drawTrail() {
+  if (!trail.length) { if (inkDirty) { clearInk(); inkDirty = false; } return; }
+  clearInk(); inkDirty = true;
+  const tNow = performance.now();
+  while (trail.length && tNow - trail[0].t > 160) { trail.shift(); if (drag && drag.kind === 'swipe') drag.anchor = Math.max(0, drag.anchor - 1); }
+  if (trail.length < 2) return;
+  const r = viewRect, d = inkDpr();
+  ictx.save(); ictx.lineCap = 'round';
+  for (let i = 1; i < trail.length; i++) {
+    const a = trail[i - 1], b = trail[i], k = i / trail.length;
+    ictx.strokeStyle = `rgba(35,32,28,${0.15 + 0.7 * k})`;
+    ictx.lineWidth = (1 + 8 * k) * d;
+    ictx.beginPath(); ictx.moveTo((a.x - r.left) * d, (a.y - r.top) * d); ictx.lineTo((b.x - r.left) * d, (b.y - r.top) * d); ictx.stroke();
+  }
+  ictx.restore();
+}
+
+/* ---------- measuring pieces ---------- */
+function pieceInfo(p) {
+  const f = FRUITS[p.fruit];
+  const share = p.vol / p.fullVol;
+  const cm3 = p.vol * CM ** 3;
+  const { q } = pieceFrame(p);
+  const mn = new THREE.Vector3(Infinity, Infinity, Infinity), mx = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+  for (const fc of p.rFaces) for (const v of fc.v) { _a.copy(v).sub(p.c).applyQuaternion(q); mn.min(_a); mx.max(_a); }
+  const dims = [mx.x - mn.x, mx.y - mn.y, mx.z - mn.z].map((d) => d * MM_PER_UNIT).sort((a, b) => b - a);
+  return { share, cm3, grams: cm3 * f.density, dims, peelShare: p.peelArea / (p.peelArea + p.cutArea), cutCm2: p.cutArea * CM * CM };
+}
+function nearFraction(x) {
+  let best = null;
+  for (let q = 1; q <= 12; q++) {
+    const p = Math.round(x * q); if (p < 1 || p > q) continue;
+    const err = Math.abs(x - p / q);
+    if (!best || err < best.err - 0.003) best = { p, q, err };
+  }
+  if (!best || best.err > 0.02) return '';
+  const g = (a, b) => (b ? g(b, a % b) : a), d = g(best.p, best.q);
+  return `≈ ${best.p / d}/${best.q / d}`;
+}
+const fmt = (v, d = 0) => v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmtG = (g) => (g >= 1000 ? [fmt(g / 1000, 2), 'kg'] : [fmt(g, g < 10 ? 1 : 0), 'g']);
+function select(p) {
+  deselect();
+  state.selected = p;
+  const o = new THREE.Mesh(p.mesh.geometry, outlineMat);
+  o.scale.setScalar(1 + 0.035 / Math.max(p.radius, 0.2));
+  o.raycast = () => {};
+  p.mesh.add(o); p.outline = o;
+  const inf = pieceInfo(p), f = FRUITS[p.fruit];
+  const sib = pieces.filter((q) => q.origin === p.origin).sort((a, b) => b.vol - a.vol);
+  const g = fmtG(inf.grams);
+  $('info').innerHTML = `
+    <div class="top"><span class="label">${p.whole ? 'Whole ' + f.name : `${cap1(f.name)} · piece ${sib.indexOf(p) + 1} of ${sib.length}`}</span><button id="infoClose" aria-label="Close">×</button></div>
+    <div class="pct">${p.whole ? '100' : fmt(inf.share * 100, 1)} %<small>${p.whole ? '' : nearFraction(inf.share)}</small></div>
+    <dl>
+      <dt>Weight</dt><dd>${g[0]} ${g[1]}</dd>
+      <dt>Volume</dt><dd>${fmt(inf.cm3, inf.cm3 < 10 ? 1 : 0)} cm³</dd>
+      <dt>Size</dt><dd>${inf.dims.map((d) => fmt(d)).join(' × ')} mm</dd>
+      <dt>Cut faces</dt><dd>${fmt(inf.cutCm2, 1)} cm²</dd>
+      <dt>Peel on surface</dt><dd>${fmt(inf.peelShare * 100)} %</dd>
+    </dl>`;
+  $('info').hidden = false;
+  $('infoClose').onclick = deselect;
+  positionInfo();
+}
+function deselect() {
+  const p = state.selected;
+  if (p && p.outline) { p.mesh.remove(p.outline); p.outline = null; }
+  state.selected = null;
+  $('info').hidden = true;
+}
+function positionInfo() {
+  const p = state.selected; if (!p) return;
+  const s = projectToScreen(_b.set(p.body.position.x, p.body.position.y, p.body.position.z));
+  const r = viewRect, card = $('info');
+  const w = card.offsetWidth, h = card.offsetHeight;
+  let x = s.x - r.left + 40, y = s.y - r.top - h / 2;
+  if (x + w > r.width - 12) x = s.x - r.left - w - 40;
+  x = THREE.MathUtils.clamp(x, 12, r.width - w - 12); y = THREE.MathUtils.clamp(y, 12, r.height - h - 12);
+  card.style.left = `${x}px`; card.style.top = `${y}px`;
+}
+function updateTags() {
+  const show = state.sizes && state.mode === 'challenge';
+  for (const p of pieces) {
+    if (!show) { if (p.tag) { p.tag.remove(); p.tag = null; } continue; }
+    if (!p.tag) { p.tag = document.createElement('div'); p.tag.className = 'tag'; $('labels').appendChild(p.tag); }
+    const share = p.vol / p.fullVol;
+    const txt = `${fmt(share * 100, share < 0.1 ? 1 : 0)} %`;
+    if (p.tag.textContent !== txt) p.tag.textContent = txt;
+    const s = projectToScreen(_b.set(p.body.position.x, p.body.position.y + p.radius * 0.75, p.body.position.z));
+    p.tag.style.left = `${s.x - viewRect.left}px`; p.tag.style.top = `${s.y - viewRect.top}px`;
+  }
+}
+
+/* ---------- UI text ---------- */
+const HINTS = {
+  knife: '<b>Knife.</b> Drag a line across the fruit. The orange outline shows exactly where the blade will cut and how big each part will be. Let go to cut. Tap a piece to measure it.',
+  hand: '<b>Hand.</b> Drag a piece to carry it; it swings a little as it moves. Scroll while holding to turn it. Drag empty space to turn the view, scroll to zoom. Tap a piece to measure it.',
+};
+function updateTitle() {
+  const t = $('title'), eb = $('eyebrow'), fact = $('fact');
+  if (state.mode === 'arcade') {
+    eb.textContent = 'Fruit Lab · Arcade · 60 seconds';
+    t.innerHTML = 'Fruit, <span>flying.</span>';
+    fact.textContent = 'Swipe through fruit while it is in the air. Sliced in mid-air scores double.';
+    return;
+  }
+  const origins = new Map();
+  for (const p of pieces) origins.set(p.origin, p.fruit);
+  const kinds = [...new Set(origins.values())];
+  if (origins.size <= 1) {
+    const key = kinds[0] || state.fruit, f = FRUITS[key];
+    eb.textContent = pieces.length ? `Fruit Lab · ${f.variety} · ${f.size}` : 'Fruit Lab';
+    if (!pieces.length) t.innerHTML = 'Empty <span>table.</span>';
+    else if (pieces.length === 1) t.innerHTML = `Whole <span>${f.name}.</span>`;
+    else t.innerHTML = `${cap1(f.name)}, <span>in ${pieces.length} pieces.</span>`;
+    fact.textContent = pieces.length ? f.fact : 'Pick a fruit on the right to put it on the table.';
+  } else {
+    eb.textContent = 'Fruit Lab · ' + kinds.map((k) => cap1(FRUITS[k].name)).join(' · ');
+    t.innerHTML = pieces.length === origins.size ? `${origins.size} whole <span>fruits.</span>` : `${origins.size} fruits, <span>${pieces.length} pieces.</span>`;
+    fact.textContent = 'Everything is at real size and weight: a lime is 50 mm across, a watermelon 220 mm.';
+  }
+}
+function updateStats() {
+  $('sPieces').textContent = pieces.length;
+  $('sCuts').textContent = state.cuts;
+  let area = 0, grams = 0;
+  for (const p of pieces) { area += p.cutArea; grams += p.vol * CM ** 3 * FRUITS[p.fruit].density; }
+  const cm2 = area * CM * CM;
+  $('sArea').textContent = fmt(cm2, cm2 < 100 ? 1 : 0);
+  const g = fmtG(grams);
+  $('sMass').textContent = g[0]; $('sMassU').textContent = g[1];
+}
+function setTool(t) {
+  state.tool = t;
+  $('toolHand').setAttribute('aria-pressed', t === 'hand');
+  $('toolKnife').setAttribute('aria-pressed', t === 'knife');
+  canvas.classList.toggle('hand', t === 'hand' && state.mode !== 'arcade');
+  $('hint').innerHTML = HINTS[t];
+  endDrag();
+  if (!knife.active) knife.group.visible = false;
+}
+function onFruitTile(key) {
+  if (state.mode === 'challenge') { state.fruit = key; markFruit(); startChallenge(state.ch.i); }
+  else addFruit(key);
+}
+function markFruit() { document.querySelectorAll('.fruit').forEach((x) => x.setAttribute('aria-pressed', state.mode === 'challenge' && x.dataset.f === state.fruit)); }
+function buildFruitButtons() {
+  const wrap = $('fruits');
+  for (const k of FRUIT_KEYS) {
+    const f = FRUITS[k], b = document.createElement('button');
+    b.className = 'fruit'; b.dataset.f = k; b.setAttribute('aria-pressed', 'false');
+    b.title = `${f.variety}, ${f.size}`;
+    b.setAttribute('aria-label', `${cap1(f.name)}, ${f.size}`);
+    b.style.setProperty('--sw', f.sw);
+    b.innerHTML = `<span class="sw"></span><b>${cap1(f.name)}</b>`;
+    b.onclick = () => onFruitTile(k);
+    wrap.appendChild(b);
+  }
+}
+
+/* ---------- modes ---------- */
+function showCard(html) { $('card').innerHTML = html; $('overlay').hidden = false; }
+function hideCard() { $('overlay').hidden = true; }
+function setMode(m) {
+  state.mode = m;
+  document.body.dataset.mode = m;
+  document.querySelectorAll('.modes button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.mode === m));
+  hideCard(); deselect(); clearInk(); hidePreview();
+  state.locked = false;
+  state.arc.running = false;
+  $('goal').hidden = m !== 'challenge';
+  $('hud').hidden = m !== 'arcade';
+  $('fruitsLabel').textContent = m === 'challenge' ? 'Fruit for the challenge' : 'Add to the table';
+  $('fruitsNote').textContent = m === 'challenge' ? '' : 'real size';
+  markFruit();
+  world.gravity.set(0, m === 'arcade' ? -G_ARCADE : -G_REAL, 0);
+  canvas.classList.toggle('hand', state.tool === 'hand' && m !== 'arcade');
+  state.autoZoom = true;
+  if (m === 'arcade') { orbit.az = 0; orbit.el = 0.42; orbit.r = orbit.rGoal = 14; orbit.ty = 1.7; fitShadow(7); clearTable(); updateTitle(); arcadeIntro(); }
+  else { orbit.el = 0.66; orbit.ty = 0.45; }
+  if (m === 'free') resetTable();
+  if (m === 'challenge') startChallenge(state.ch.i);
+  resize();
+}
+
+/* challenges */
+function startChallenge(i) {
+  hideCard(); deselect();
+  state.sizes = false;
+  state.ch = { i, used: 0, done: false };
+  state.locked = false;
+  const c = CHALLENGES[i];
+  $('gStep').textContent = `Challenge ${i + 1} of ${CHALLENGES.length}`;
+  $('gName').textContent = c.name;
+  $('gText').textContent = c.text;
+  const best = store.get('best.' + i, null);
+  $('gBest').textContent = best === null ? '' : `Best ${fmt(best, 1)} %`;
+  renderMeter();
+  resetTable();
+}
+function renderMeter() {
+  const c = CHALLENGES[state.ch.i];
+  $('gMeter').innerHTML = Array.from({ length: c.cuts }, (_, k) => `<i class="${k < state.ch.used ? 'on' : ''}"></i>`).join('');
+  $('gCuts').textContent = `Cuts ${state.ch.used} / ${c.cuts}`;
+}
+function onChallengeCut() {
+  const c = CHALLENGES[state.ch.i];
+  state.ch.used++;
+  renderMeter();
+  if (state.ch.used >= c.cuts) { state.locked = true; setTimeout(scoreChallenge, 1400); }
+}
+function scoreChallenge() {
+  if (state.mode !== 'challenge' || state.ch.done) return;
+  state.ch.done = true;
+  const c = CHALLENGES[state.ch.i];
+  const shares = pieces.map((p) => p.vol / p.fullVol).sort((a, b) => b - a);
+  const target = [...c.shares].sort((a, b) => b - a);
+  const n = Math.max(shares.length, target.length);
+  let tvd = 0;
+  for (let k = 0; k < n; k++) tvd += Math.abs((shares[k] || 0) - (target[k] || 0));
+  const acc = Math.max(0, (1 - tvd / 2) * 100);
+  const grade = GRADES.find(([min]) => acc >= min)[1];
+  const prev = store.get('best.' + state.ch.i, null);
+  const isBest = prev === null || acc > prev;
+  if (isBest) store.set('best.' + state.ch.i, acc);
+  state.sizes = true;
+  sfx.ding(acc >= 92 ? 1.25 : 1);
+  const bars = shares.map((s, k) => `<div><span><b style="width:${Math.min(s, 1) * 100}%"></b><i style="left:${(target[k] || 0) * 100}%"></i></span>${fmt(s * 100, 1)} %</div>`).join('');
+  const last = state.ch.i === CHALLENGES.length - 1;
+  showCard(`
+    <span class="label grade">${c.name} · ${grade}${isBest ? ' · new best' : ''}</span>
+    <div class="big">${fmt(acc, 1)} %</div>
+    <p>Accuracy against the target. ${shares.length === target.length ? `You made ${shares.length} pieces.` : `You made ${shares.length} pieces; the goal was ${target.length}.`} The black ticks mark the ideal size of each piece.</p>
+    <div class="bars">${bars}</div>
+    <div class="btns"><button id="cRetry">Try again</button><button class="primary" id="cNext">${last ? 'Back to challenge 1' : 'Next challenge'}</button></div>`);
+  $('cRetry').onclick = () => startChallenge(state.ch.i);
+  $('cNext').onclick = () => startChallenge(last ? 0 : state.ch.i + 1);
+}
+
+/* arcade */
+function arcadeIntro() {
+  const best = store.get('arcadeBest', 0);
+  showCard(`
+    <span class="label grade">Arcade · 60 seconds</span>
+    <h2 class="display">Slice it in the air.</h2>
+    <p>Fruit gets tossed up from the edge of the table. Swipe through it. Every split scores a point, two if the piece is still airborne. Slice three or more in one swipe for a combo bonus.</p>
+    ${best ? `<p>Your best: <b>${best}</b></p>` : ''}
+    <div class="btns"><button class="primary" id="aStart">Start</button></div>`);
+  $('aStart').onclick = startArcade;
+}
+function startArcade() {
+  hideCard(); clearTable();
+  Object.assign(state.arc, { running: true, time: 60, score: 0, splits: 0, dropped: 0, spawnT: 0.4, bestCombo: 0 });
+  updateHud();
+}
+function updateHud() {
+  $('hScore').textContent = state.arc.score;
+  $('hTime').textContent = Math.ceil(state.arc.time);
+  $('hTimeBox').classList.toggle('low', state.arc.time <= 10);
+}
+function tossFruit() {
+  if (state.mode !== 'arcade' || !state.arc.running) return;
+  const key = FRUIT_KEYS[Math.floor(Math.random() * FRUIT_KEYS.length)];
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const x = side * (2.5 + Math.random() * 2.5), z = 0.4 + Math.random() * 1.4;
+  const pos = new THREE.Vector3(x, 1.4, z);
+  const vy = Math.sqrt(2 * G_ARCADE * (3 + Math.random() * 1.3));
+  const vel = new THREE.Vector3(-side * (1.2 + Math.random() * 2.2), vy, -(0.3 + Math.random() * 0.8));
+  const ang = new THREE.Vector3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6);
+  spawnFruit(key, { pos, vel, ang });
+}
+function updateArcade(dt) {
+  const a = state.arc;
+  for (const p of [...pieces]) {
+    const age = now() - p.born;
+    if (!p.dying && ((p.landed && age > 2.5) || pieces.length > 45 || p.body.position.y < -3)) p.dying = true;
+    if (p.dying) { p.fade -= dt * 3; if (p.fade <= 0) removePiece(p); }
+  }
+  if (!a.running) return;
+  a.time -= dt;
+  a.spawnT -= dt;
+  if (a.spawnT <= 0) {
+    const n = 1 + (Math.random() < 0.4) + (Math.random() < 0.15) + (a.time < 25 && Math.random() < 0.3);
+    for (let i = 0; i < n; i++) setTimeout(tossFruit, i * 140);
+    a.spawnT = Math.max(0.7, 1.5 - (60 - a.time) * 0.012) + Math.random() * 0.4;
+  }
+  if (a.time <= 0) { a.time = 0; a.running = false; arcadeEnd(); }
+  updateHud();
+}
+function arcadeEnd() {
+  const a = state.arc, prev = store.get('arcadeBest', 0), isBest = a.score > prev;
+  if (isBest) store.set('arcadeBest', a.score);
+  sfx.ding(1.3);
+  showCard(`
+    <span class="label grade">Time · ${isBest ? 'new best' : `best ${prev}`}</span>
+    <div class="big">${a.score}</div>
+    <dl class="facts">
+      <div><dt class="label">Splits</dt><dd>${a.splits}</dd></div>
+      <div><dt class="label">Best combo</dt><dd>${a.bestCombo ? '×' + a.bestCombo : '–'}</dd></div>
+      <div><dt class="label">Dropped whole</dt><dd>${a.dropped}</dd></div>
+    </dl>
+    <div class="btns"><button id="aFree">Back to free cut</button><button class="primary" id="aAgain">Play again</button></div>`);
+  $('aAgain').onclick = startArcade;
+  $('aFree').onclick = () => setMode('free');
+}
+
+/* ---------- controls ---------- */
+buildFruitButtons();
+document.querySelectorAll('.modes button').forEach((b) => (b.onclick = () => setMode(b.dataset.mode)));
+$('toolHand').onclick = () => setTool('hand');
+$('toolKnife').onclick = () => setTool('knife');
+$('firm').oninput = (e) => { state.firm = +e.target.value; $('firmOut').textContent = fmt(state.firm, 2); applySoftness(); };
+const SOUND_ON = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5h3l4-3.5v12l-4-3.5h-3z" fill="currentColor"/><path d="M13.5 7a4 4 0 0 1 0 6M15.8 4.8a7 7 0 0 1 0 10.4"/></svg>';
+const SOUND_OFF = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5h3l4-3.5v12l-4-3.5h-3z" fill="currentColor"/><path d="m13.5 8 4 4m0-4-4 4"/></svg>';
+function renderSound() {
+  const b = $('soundBtn');
+  b.innerHTML = state.sound ? SOUND_ON : SOUND_OFF;
+  b.setAttribute('aria-pressed', state.sound);
+  b.setAttribute('aria-label', state.sound ? 'Sound on. Turn off' : 'Sound off. Turn on');
+}
+$('soundBtn').onclick = () => { state.sound = !state.sound; store.set('sound', state.sound); renderSound(); if (state.sound) { sfx.unlock(); sfx.ding(1); } };
+renderSound();
+function renderPanel() {
+  $('panel').hidden = !state.panelOpen;
+  $('panelBtn').setAttribute('aria-expanded', state.panelOpen);
+}
+$('panelBtn').onclick = () => { state.panelOpen = !state.panelOpen; store.set('panel', state.panelOpen); renderPanel(); };
+renderPanel();
+$('nudge').onclick = () => {
+  const up = Math.sqrt(2 * -world.gravity.y * 0.9);
+  for (const p of pieces) {
+    const b = p.body; b.wakeUp();
+    b.velocity.x += (Math.random() - 0.5) * up * 0.4; b.velocity.y += up * (0.6 + Math.random() * 0.4); b.velocity.z += (Math.random() - 0.5) * up * 0.4;
+    b.angularVelocity.x += (Math.random() - 0.5) * 8; b.angularVelocity.z += (Math.random() - 0.5) * 8;
+    p.sv -= 1.2 * (1.25 - state.firm);
+  }
+};
+$('reset').onclick = () => {
+  if (state.mode === 'challenge') { startChallenge(state.ch.i); return; }
+  clearTable(); state.autoZoom = true; updateStats(); updateTitle();
+};
+addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' && e.target.type === 'range') return;
+  if (e.key === 'Escape') { deselect(); return; }
+  if (e.key === 'm' || e.key === 'M') { $('soundBtn').click(); return; }
+  if (state.mode === 'arcade') return;
+  if (e.key === 'k' || e.key === 'K') setTool('knife');
+  else if (e.key === 'h' || e.key === 'H') setTool('hand');
+  else if (e.key === 'r' || e.key === 'R') $('reset').click();
+  else if (e.key === 'f' || e.key === 'F') $('panelBtn').click();
+});
+
+/* ---------- loop ---------- */
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  renderer.setPixelRatio(dpr);
+  renderer.setSize(w, h, false);
+  const idpr = Math.min(devicePixelRatio || 1, 2);
+  ink.width = Math.round(w * idpr); ink.height = Math.round(h * idpr);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  viewRect = canvas.getBoundingClientRect();
+  updateCamera();
+}
+addEventListener('resize', resize);
+
+let simTime = 0;
+function now() { return simTime; }
+const _m = new THREE.Matrix4(), _s = new THREE.Matrix4(), _q = new THREE.Quaternion();
+function syncMeshes(dt) {
+  const k = 90 + state.firm * 650, c = 9 + DAMP * 40;
+  for (const p of [...pieces]) {
+    const b = p.body;
+    if (!isFinite(b.position.x) || !isFinite(b.position.y) || !isFinite(b.quaternion.w)) { removePiece(p); continue; }
+    if (dt > 0) {
+      const steps = 3, h = dt / steps;
+      for (let i = 0; i < steps; i++) { p.sv += (-k * p.s - c * p.sv) * h; p.s += p.sv * h; }
+      p.s = THREE.MathUtils.clamp(p.s, -0.28, 0.28);
+    }
+    const s = p.s, fd = Math.max(p.fade, 0.001);
+    _q.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
+    _m.makeRotationFromQuaternion(_q);
+    const lat = (1 - s * 0.5) * fd, ax = (1 + s) * fd;
+    _s.set(lat, 0, 0, 0, 0, ax, 0, 0, 0, 0, lat, 0, 0, 0, 0, 1);
+    _m.premultiply(_s);
+    _m.setPosition(b.position.x, b.position.y, b.position.z);
+    p.mesh.matrix.copy(_m);
+    p.mesh.matrixWorldNeedsUpdate = true;
+  }
+}
+function autoFrame(dt) {
+  if (state.mode !== 'arcade' && state.autoZoom && pieces.length) {
+    let ext = 1, top = 0;
+    for (const p of pieces) { ext = Math.max(ext, Math.hypot(p.body.position.x, p.body.position.z) + p.radius); top = Math.max(top, p.body.position.y + p.radius); }
+    orbit.rGoal = THREE.MathUtils.clamp(6 + ext * 3.1 + top * 1.1, 9, 40);
+    orbit.ty = THREE.MathUtils.lerp(orbit.ty, THREE.MathUtils.clamp(top * 0.3, 0.45, 2), 1 - Math.exp(-dt * 3));
+    fitShadow(ext);
+  }
+  if (Math.abs(orbit.r - orbit.rGoal) > 0.01) orbit.r = THREE.MathUtils.lerp(orbit.r, orbit.rGoal, 1 - Math.exp(-dt * 4));
+  updateCamera();
+}
+// adaptive resolution: keep the frame rate up on slower machines
+const perf = { acc: 0, n: 0, good: 0 };
+function adaptQuality(ms) {
+  if (ms > 250) return; // tab was hidden or paused
+  perf.acc += ms; perf.n++;
+  if (perf.n < 45) return;
+  const avg = perf.acc / perf.n; perf.acc = 0; perf.n = 0;
+  if (avg > 26 && dpr > 0.75) { dpr = Math.max(0.75, dpr - 0.25); perf.good = 0; resize(); }
+  else if (avg < 15 && dpr < DPR_MAX) { if (++perf.good >= 4) { dpr = Math.min(DPR_MAX, dpr + 0.25); perf.good = 0; resize(); } }
+  else perf.good = 0;
+}
+let last = performance.now();
+function frame(t) {
+  requestAnimationFrame(frame);
+  const raw = Math.max(0, t - last); last = Math.max(last, t);
+  const dt = Math.min(raw / 1000, 1 / 30);
+  if (dt <= 0) return;
+  try {
+    simTime += dt;
+    world.step(1 / 150, dt, 5);
+    updateKnife(dt);
+    if (state.mode === 'arcade') { updateArcade(dt); drawTrail(); }
+    syncMeshes(dt);
+    particles.update(dt);
+    for (const s of stains) if (s.t < 1) { s.t = Math.min(1, s.t + dt / 0.9); s.mesh.scale.setScalar(s.size * (1 - Math.pow(1 - s.t, 3))); }
+    autoFrame(dt);
+    renderer.render(scene, camera);
+    updateTags();
+    positionInfo();
+    adaptQuality(raw);
+  } catch (err) {
+    console.error(err);
+    for (const p of [...pieces]) if (!isFinite(p.body.position.x)) removePiece(p);
+  }
+}
+
+document.body.dataset.mode = 'free';
+applySoftness();
+setTool('knife');
+resize();
+resetTable();
+requestAnimationFrame(frame);
+
+// hook for scripted demos and tests: cut along a line given in table coordinates
+window.fruitLab = {
+  cut: (ax, az, bx, bz) => { const h = lineHeight(); return releaseKnife(new THREE.Vector3(ax, h, az), new THREE.Vector3(bx, h, bz)); },
+  preview: (ax, az, bx, bz) => { const h = lineHeight(); updatePreview(new THREE.Vector3(ax, h, az), new THREE.Vector3(bx, h, bz), true); },
+  setMode, addFruit, pieces, state, orbit, camera, world,
+  timing: () => { const t0 = performance.now(); world.step(1 / 120); const t1 = performance.now(); renderer.render(scene, camera); return { physicsMs: t1 - t0, pieces: pieces.length, dpr }; },
+};
+</script>
+
+</body>
+</html>
