@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Fruit Lab: a personal sandbox by Václav Jícha. Put real-size fruit on a table, preview and slice it, measure every piece, cut exact fractions or swipe flying fruit.">
+<meta name="description" content="Fruit Lab: a personal sandbox by Václav Jícha. Slice real-size fruit, make juice, cut exact fractions in 8 levels, or swipe flying fruit in the arcade.">
 <meta name="author" content="Václav Jícha">
 <meta name="theme-color" content="#eeece6">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23ec8312'/%3E%3Ccircle cx='16' cy='16' r='10.5' fill='%23f1ddb4'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%23f39a24'/%3E%3Cg stroke='%23f1ddb4' stroke-width='1.2'%3E%3Cpath d='M16 7v18M7 16h18M9.6 9.6l12.8 12.8M22.4 9.6 9.6 22.4'/%3E%3C/g%3E%3C/svg%3E">
@@ -139,6 +139,8 @@ body[data-mode="arcade"] .panel { display: none; }
 .stats dd { grid-row: 2; margin: 0; font-family: var(--f-display); font-variation-settings: "SOFT" 100; font-weight: 600; font-size: 26px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .stats dd small { font: 600 11px var(--f-body); color: var(--ink-2); margin-left: 3px; }
 body:not([data-mode="free"]) .notes { display: none; }
+body:not([data-mode="free"]) .free-only { display: none !important; }
+body[data-mode="arcade"] .masthead { display: none; }
 
 
 .goal {
@@ -154,7 +156,7 @@ body:not([data-mode="free"]) .notes { display: none; }
 .goal .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 
 .hud {
-  position: absolute; left: 50%; transform: translateX(-50%); top: max(20px, env(safe-area-inset-top, 0px));
+  position: absolute; left: max(24px, env(safe-area-inset-left, 0px)); top: max(20px, env(safe-area-inset-top, 0px));
   display: flex; gap: 30px; align-items: end; pointer-events: none; text-align: center; margin: 0;
 }
 .hud dd { margin: 0; font-family: var(--f-display); font-variation-settings: "SOFT" 100, "WONK" 1; font-weight: 700; font-size: 52px; line-height: 1; font-variant-numeric: tabular-nums; }
@@ -201,6 +203,9 @@ body:not([data-mode="free"]) .notes { display: none; }
   font: 700 12px/1 var(--f-body); font-variant-numeric: tabular-nums; background: rgba(35, 32, 28, 0.88); color: var(--paper-hi);
 }
 .tag.preview { background: var(--zest); color: #fff; font-size: 13px; padding: 5px 8px; }
+.tag.juice { display: grid; gap: 3px; text-align: center; padding: 8px 11px; border-radius: 12px; background: var(--paper-hi); color: var(--ink); border: 1.5px solid var(--rule); box-shadow: 0 6px 18px rgba(60,40,10,.12); font-weight: 600; }
+.tag.juice b { font-family: var(--f-display); font-variation-settings: "SOFT" 100, "WONK" 1; font-size: 17px; font-weight: 700; }
+.tag.juice span { font-size: 11.5px; color: var(--ink-2); }
 .tag.preview em { font-style: normal; opacity: .6; margin: 0 5px; }
 .pop {
   position: absolute; transform: translate(-50%, -50%); pointer-events: none; white-space: nowrap;
@@ -217,7 +222,103 @@ body:not([data-mode="free"]) .notes { display: none; }
 
 .err { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; font-size: 20px; }
 
-@media (max-width: 1150px) { .hint { display: none; } }
+.iconbtn.profile { width: auto; display: inline-flex; gap: 8px; padding: 0 12px 0 6px; }
+.iconbtn.profile .av, .lb .av { width: 30px; height: 30px; border-radius: 50%; background-size: cover; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); flex: none; }
+.iconbtn.profile .pn { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card.wide { width: min(600px, 100%); max-height: calc(100% - 24px); overflow-y: auto; }
+.card .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.card .small { font-size: 12.5px; }
+.levels { display: grid; gap: 6px; }
+.lvl, .diff { display: grid; grid-template-columns: auto 1fr auto auto auto; gap: 6px 12px; align-items: center; padding: 10px 12px; border: 1.5px solid var(--rule); border-radius: 14px; background: var(--paper-hi); }
+.diff { grid-template-columns: 1fr auto auto; }
+.lvl.cur { border-color: var(--ink-2); }
+.lvl .num { font: 700 20px/1 var(--f-display); width: 22px; text-align: center; color: var(--zest); }
+.lvl .meta, .diff .meta { display: grid; gap: 2px; min-width: 0; }
+.lvl .meta strong, .diff .meta strong { font-size: 15px; }
+.lvl .meta small, .diff .meta small { color: var(--ink-2); font-size: 12.5px; line-height: 1.35; }
+.lvl .best, .diff .best { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 13px; min-width: 52px; text-align: right; }
+.acts { display: flex; gap: 6px; }
+.acts button { padding: 8px 10px; }
+.acts .primary { padding: 8px 14px; font-size: 13px; }
+.lbbox { grid-column: 1 / -1; }
+.stars { display: inline-flex; gap: 1px; font-size: 16px; line-height: 1; }
+.stars i { font-style: normal; color: var(--rule); }
+.stars i.on { color: #f0a020; }
+.lb { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; }
+.lb li { display: grid; grid-template-columns: 22px 24px 1fr auto auto; gap: 8px; align-items: center; padding: 5px 8px; border-radius: 10px; background: var(--paper); font-size: 13px; }
+.lb li.me { background: #fde7d3; }
+.lb .av { width: 22px; height: 22px; }
+.lb .rk { font-weight: 700; color: var(--ink-2); text-align: center; }
+.lb .nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb .sub { color: var(--ink-2); font-size: 12px; }
+.lb .sc { font-weight: 700; font-variant-numeric: tabular-nums; }
+.empty { font-size: 13px; margin: 4px 0 0 !important; }
+.field { display: grid; gap: 6px; }
+.field input { font: 600 16px var(--f-body); padding: 10px 12px; border: 1.5px solid var(--rule); border-radius: 10px; background: var(--paper); color: var(--ink); user-select: text; -webkit-user-select: text; }
+.avatars { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+.avopt { padding: 7px 0; }
+.avopt[aria-pressed="true"] { background: var(--paper-hi) !important; outline: 2px solid var(--zest); outline-offset: -2px; }
+.knives { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.knifeopt { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 5px; padding: 10px; border-radius: 12px; text-align: left; height: 100%; }
+.knives { align-items: stretch; }
+.knifeopt .perk { font-size: 11.5px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+.knifeopt .req { margin-top: auto; padding-top: 4px; font-size: 11px; font-weight: 500; color: var(--ink-2); line-height: 1.3; display: flex; gap: 4px; align-items: flex-start; }
+.knifeopt .req svg { width: 11px; height: 11px; flex: none; margin-top: 1px; }
+.knifeopt.locked { background: var(--paper); cursor: help; }
+.knifeopt.locked .blade { filter: grayscale(.6); opacity: .6; }
+.knifeopt.locked b { color: var(--ink-2); }
+.recipes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.recipe em { font-style: normal; font-weight: 700; }
+.recipe.got.t-rare { background: #e6e3fb; } .recipe.got.t-rare em { color: #5b4cc4; }
+.recipe.got.t-legendary { background: linear-gradient(120deg, #fff0c2, #ffe1a1); box-shadow: inset 0 0 0 1.5px #e3b23c; } .recipe.got.t-legendary em { color: #a8740c; }
+.cbbtn { justify-self: start; }
+.cbwarn { display: grid; gap: 10px; padding: 12px 14px; border-radius: 12px; background: #fff3e0; border: 1.5px solid #f2c48a; }
+.cbwarn p { font-size: 13.5px !important; color: var(--ink) !important; }
+.cbwarn .btns { justify-content: flex-start; }
+.cblist { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.cblist li { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 7px 10px; border-radius: 10px; background: var(--paper); }
+.cblist li small { grid-column: 1 / -1; font-size: 12px; color: var(--ink-2); }
+.cblist li em { font-style: normal; font-weight: 700; color: var(--leaf); }
+.cblist .tier { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); }
+.cblist li.t-rare { background: #eeebfc; } .cblist li.t-rare .tier { color: #5b4cc4; }
+.cblist li.t-legendary { background: #fff3d1; } .cblist li.t-legendary .tier { color: #a8740c; }
+.rqs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.rq { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 700 12px/1 var(--f-body); color: var(--ink-2); background: var(--paper); border: 1.5px solid var(--rule); cursor: help; }
+.rq.t-rare { border-color: #9d92e6; color: #5b4cc4; }
+.rq.t-legendary { border-color: #e3b23c; color: #a8740c; background: #fff6dc; }
+.tag.juice.t-rare b { color: #5b4cc4; }
+.tag.juice .also { font-style: italic; }
+.tag.juice .bonus { justify-self: center; padding: 2px 8px; border-radius: 999px; font-weight: 700; color: #fff; background: #5b4cc4; }
+.tag.juice .bonus.t-legendary { background: #c8901a; }
+.tag.juice.t-legendary { border-color: #e3b23c; background: #fff6dc; }
+.tag.juice.t-legendary b { color: #a8740c; }
+.heartsbox { display: grid; gap: 6px; justify-items: center; }
+.idle { width: 100%; min-width: 96px; height: 5px; border-radius: 3px; background: var(--rule); overflow: hidden; }
+.idle i { display: block; height: 100%; width: 100%; background: var(--ink-2); border-radius: 3px; }
+.idle i.warn { background: #e2493a; }
+.recipe { display: grid; gap: 2px; padding: 8px 10px; border-radius: 10px; background: var(--paper); font-size: 13px; }
+.recipe small { font-size: 11.5px; color: var(--ink-2); line-height: 1.3; }
+.recipe.got { background: #fde7d3; }
+.actions #juiceBtn { grid-column: 1 / -1; }
+.knifeopt .blade { height: 10px; border-radius: 2px 10px 10px 2px; box-shadow: inset 0 -2px 0 rgba(0,0,0,.12); }
+.knifeopt b { font-size: 13px; }
+.knifeopt small { font-size: 11px; font-weight: 500; color: var(--ink-2); line-height: 1.3; }
+.knifeopt[aria-pressed="true"] { background: var(--paper-hi); color: var(--ink); outline: 2px solid var(--zest); outline-offset: -2px; }
+.lvbtn { justify-self: start; padding: 7px 10px; font-size: 12.5px; pointer-events: auto; }
+.hearts { display: flex; gap: 4px; align-items: center; height: 52px; }
+.hearts svg { width: 26px; height: 24px; fill: none; stroke: #d24a3a; stroke-width: 1.6; }
+.hearts svg.on { fill: #e2493a; }
+.drinkfx { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .5s ease; background: radial-gradient(120% 90% at 50% 70%, rgba(0,0,0,0) 45%, rgba(40,25,10,.38) 100%); }
+.drinkfx.on { opacity: 1; }
+.masthead, .notes, .panel, .dock, .topbar { transition: opacity .35s ease; }
+body.drinking .masthead, body.drinking .notes, body.drinking .panel, body.drinking .dock, body.drinking .topbar { opacity: 0; pointer-events: none; }
+.flash { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(circle at 50% 50%, rgba(255,170,60,.35), rgba(200,40,20,.25)); }
+.flash.on { animation: flash .5s ease-out; }
+@keyframes flash { 0% { opacity: 1; } 100% { opacity: 0; } }
+#app.shake { animation: shake .35s ease-out; }
+@keyframes shake { 20% { transform: translate(-8px, 3px); } 40% { transform: translate(7px, -4px); } 60% { transform: translate(-5px, 2px); } 80% { transform: translate(3px, -1px); } }
+@media (max-width: 1150px) { .hint { display: none; } .iconbtn.profile .pn { display: none; } .iconbtn.profile { padding: 0 6px; } }
+@media (min-width: 761px) and (max-width: 1240px) { .masthead { top: calc(max(20px, env(safe-area-inset-top, 0px)) + 64px); max-width: calc(100% - 380px); } }
 @media (max-width: 760px) {
   .masthead { left: max(16px, env(safe-area-inset-left, 0px)); top: max(66px, calc(env(safe-area-inset-top, 0px) + 62px)); max-width: calc(100% - 32px); }
   .masthead h1 { font-size: 32px; }
@@ -225,7 +326,25 @@ body:not([data-mode="free"]) .notes { display: none; }
   .masthead p { display: none; }
   .topbar { top: max(12px, env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); }
   .modes { flex: 1; }
-  .modes button { flex: 1; padding: 9px 6px; }
+  .iconbtn.profile { padding: 0 6px; }
+  .iconbtn.profile .pn { display: none; }
+  .lvl { grid-template-columns: auto 1fr auto; }
+  .lvl .best { display: none; }
+  .lvl .acts, .diff .acts { grid-column: 1 / -1; justify-content: flex-end; }
+  .diff { grid-template-columns: 1fr auto; }
+  .avatars { grid-template-columns: repeat(4, 1fr); }
+  .knives { grid-template-columns: repeat(2, 1fr); }
+  .knives .knifeopt:last-child { grid-column: 1 / -1; }
+  .recipes { grid-template-columns: 1fr; }
+  .hearts { height: 38px; }
+  .hearts svg { width: 20px; height: 18px; }
+  .hud { gap: 18px; }
+  .tag.juice { padding: 6px 9px; }
+  .tag.juice b { font-size: 14px; }
+  .tag.juice span:last-child:not(:nth-child(2)) { display: none; }
+  .modes button { flex: 1; padding: 9px 4px; font-size: 12.5px; white-space: nowrap; }
+  .topbar { gap: 6px; }
+  .iconbtn { width: 40px; }
   .dock { right: auto; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom, 0px)); }
   .dock button { padding: 10px 12px; }
   .panel {
@@ -244,7 +363,7 @@ body:not([data-mode="free"]) .notes { display: none; }
   .goal { top: calc(max(66px, calc(env(safe-area-inset-top, 0px) + 62px)) + 46px); bottom: auto; left: max(16px, env(safe-area-inset-left, 0px)); padding: 10px 14px; }
   .goal h2 { font-size: 22px; }
   .goal p { font-size: 13px; }
-  .hud { top: max(66px, calc(env(safe-area-inset-top, 0px) + 62px)); }
+  .hud { top: max(66px, calc(env(safe-area-inset-top, 0px) + 62px)); left: 50%; transform: translateX(-50%); }
   .hud dd { font-size: 38px; }
   body[data-mode="arcade"] .masthead { display: none; }
 }
@@ -264,12 +383,14 @@ body:not([data-mode="free"]) .notes { display: none; }
   </header>
 
   <div class="topbar">
+    <button class="iconbtn profile" id="profileBtn" title="Your profile"></button>
     <nav class="modes" aria-label="Mode">
       <button data-mode="free" aria-pressed="true">Free cut</button>
       <button data-mode="challenge" aria-pressed="false">Challenges</button>
       <button data-mode="arcade" aria-pressed="false">Arcade</button>
     </nav>
     <button class="iconbtn" id="soundBtn" aria-pressed="true" title="Sound (M)"></button>
+    <button class="iconbtn" id="fsBtn" title="Full screen" aria-label="Full screen"></button>
   </div>
 
   <div class="dock" id="dock" aria-label="Tools">
@@ -292,6 +413,9 @@ body:not([data-mode="free"]) .notes { display: none; }
     <div class="actions">
       <button id="nudge">Shake table</button>
       <button id="reset" title="Clear the table (R)">Clear table</button>
+      <button id="juiceBtn" class="free-only" aria-pressed="false">Juice glass</button>
+      <button id="drinkBtn" class="free-only primary" disabled>Drink it</button>
+      <button id="emptyBtn" class="free-only" disabled>Pour out</button>
     </div>
     <p class="credit">A personal sandbox by <b>Václav Jícha</b>, vibe-coded with Claude Opus 5.5.</p>
   </aside>
@@ -312,13 +436,18 @@ body:not([data-mode="free"]) .notes { display: none; }
     <h2 class="display" id="gName">Halves</h2>
     <p id="gText">Cut the fruit into two equal halves.</p>
     <div class="row"><div class="meter" id="gMeter"></div><span class="label" id="gCuts">Cuts 0 / 1</span></div>
+    <button id="gLevels" class="lvbtn">All levels and scores</button>
   </section>
 
   <dl class="hud" id="hud" hidden>
     <div><dt class="label">Score</dt><dd id="hScore">0</dd></div>
+    <div><dt class="label">Level</dt><dd id="hLevel">1</dd></div>
     <div id="hTimeBox"><dt class="label">Seconds</dt><dd id="hTime">60</dd></div>
+    <div id="hHeartsBox" hidden><dt class="label">Hearts · keep slicing</dt><dd class="heartsbox"><span id="hHearts" class="hearts"></span><span class="idle" title="Slice something before this runs out"><i id="hIdle"></i></span></dd></div>
   </dl>
 
+  <div class="flash" id="flash"></div>
+  <div class="drinkfx" id="drinkfx"></div>
   <div class="info" id="info" hidden></div>
   <div class="toast" id="toast" hidden></div>
   <div class="overlay" id="overlay" hidden><div class="card" id="card"></div></div>
@@ -417,11 +546,14 @@ const FRUIT_KEYS = Object.keys(FRUITS);
 const cap1 = (s) => s[0].toUpperCase() + s.slice(1);
 
 const CHALLENGES = [
-  { name: 'Halves', cuts: 1, shares: [1 / 2, 1 / 2], text: 'Cut it into two equal halves with one cut.' },
-  { name: 'One third', cuts: 1, shares: [2 / 3, 1 / 3], text: 'Cut off exactly a third of the fruit. One cut.' },
-  { name: 'Quarters', cuts: 2, shares: [1 / 4, 1 / 4, 1 / 4, 1 / 4], text: 'Four equal pieces in two cuts.' },
-  { name: 'Six wedges', cuts: 3, shares: Array(6).fill(1 / 6), text: 'Six equal wedges in three cuts, like slicing a cake.' },
-  { name: 'Eighths', cuts: 3, shares: Array(8).fill(1 / 8), text: 'Eight equal pieces in three cuts. Move pieces with the hand if you need to.' },
+  { id: 'halves', name: 'Halves', cuts: 1, shares: [1 / 2, 1 / 2], text: 'Two equal halves with one cut.' },
+  { id: 'third', name: 'One third', cuts: 1, shares: [2 / 3, 1 / 3], text: 'Cut off exactly a third of the fruit. One cut.' },
+  { id: 'quarter-off', name: 'A quarter off', cuts: 1, shares: [3 / 4, 1 / 4], text: 'Cut off exactly a quarter. One cut.' },
+  { id: 'three', name: 'Three equal', cuts: 2, shares: [1 / 3, 1 / 3, 1 / 3], text: 'Three equal pieces with two cuts.' },
+  { id: 'quarters', name: 'Quarters', cuts: 2, shares: [1 / 4, 1 / 4, 1 / 4, 1 / 4], text: 'Four equal pieces in two cuts.' },
+  { id: 'tenth', name: 'A thin tenth', cuts: 1, shares: [9 / 10, 1 / 10], text: 'Shave off exactly a tenth. One cut, steady hand.' },
+  { id: 'sixths', name: 'Six wedges', cuts: 3, shares: Array(6).fill(1 / 6), text: 'Six equal wedges in three cuts, like slicing a cake.' },
+  { id: 'eighths', name: 'Eighths', cuts: 3, shares: Array(8).fill(1 / 8), text: 'Eight equal pieces in three cuts. Move pieces with the hand if you need to.' },
 ];
 const GRADES = [[97, 'Surgeon'], [92, 'Head chef'], [84, 'Line cook'], [70, 'Home cook'], [0, 'Smoothie']];
 
@@ -437,7 +569,7 @@ const state = {
   mode: 'free', tool: 'knife', fruit: 'orange', firm: 0.5, sizes: false, sound: store.get('sound', true),
   cuts: 0, locked: false, selected: null, autoZoom: true, panelOpen: store.get('panel', innerWidth > 760),
   ch: { i: 0, used: 0, done: false },
-  arc: { running: false, time: 60, score: 0, splits: 0, dropped: 0, spawnT: 0, bestCombo: 0 },
+  arc: { diff: 'normal', running: false, time: 60, elapsed: 0, hearts: 5, score: 0, splits: 0, dropped: 0, spawnT: 0, bestCombo: 0, level: 1, bombsHit: 0 },
 };
 
 /* ---------- renderer / scene ---------- */
@@ -461,6 +593,7 @@ renderer.toneMappingExposure = 1.05;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.setClearColor(0x000000, 0);
+renderer.localClippingEnabled = true;
 
 const scene = new THREE.Scene();
 const pmrem = new THREE.PMREMGenerator(renderer);
@@ -475,7 +608,7 @@ function updateCamera() {
   camTarget.y = orbit.ty;
   camera.position.set(camTarget.x + r * Math.cos(el) * Math.sin(az), camTarget.y + r * Math.sin(el), camTarget.z + r * Math.cos(el) * Math.cos(az));
   camera.lookAt(camTarget);
-  const minW = state.mode === 'arcade' ? 9 : 5.6, tanH = Math.tan(THREE.MathUtils.degToRad(15));
+  const minW = state.mode === 'arcade' ? 13 : 5.6, tanH = Math.tan(THREE.MathUtils.degToRad(15));
   const fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.max(tanH, (minW / 2) / r / camera.aspect)));
   if (Math.abs(fov - camera.fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
   camera.updateMatrixWorld();
@@ -1004,7 +1137,7 @@ const outlineMat = new THREE.MeshBasicMaterial({ color: 0x23201c, side: THREE.Ba
 const templates = {};
 function fruitScale(key) {
   const real = FRUITS[key].mmPerUnit / MM_PER_UNIT;
-  return state.mode === 'arcade' ? THREE.MathUtils.clamp(real, 0.8, 1.45) : real;
+  return state.mode === 'arcade' ? THREE.MathUtils.clamp(real, 0.75, 1.2) : real;
 }
 function getTemplate(key, k) {
   const id = `${key}|${k.toFixed(3)}`;
@@ -1016,7 +1149,7 @@ function getTemplate(key, k) {
   let peelArea = 0; for (const fc of rF) peelArea += faceArea(fc);
   return (templates[id] = { key, k, rF, pF, vol, cen, radius, peelArea, geo: buildGeometry(rF, cen, k), hull: hullData(pF, cen) });
 }
-function pieceMask() { return state.mode === 'arcade' ? G_STATIC : G_STATIC | G_PIECE; }
+function pieceMask() { return state.mode === 'arcade' ? 0 : G_STATIC | G_PIECE; }
 function makePiece(spec) {
   const { fruit, k, q, T, vel, ang, whole, origin, fullVol } = spec;
   let rFaces, pFaces, vol, cen, geo, hull, radius, cutArea = 0, peelArea = 0, shared = false;
@@ -1087,9 +1220,11 @@ function clearTable() {
   for (const s of stains) { scene.remove(s.mesh); s.mesh.geometry.dispose(); s.mesh.material.dispose(); }
   stains.length = 0;
   particles.clear();
+  if (typeof bombs !== 'undefined') for (const b of [...bombs]) removeBomb(b);
   state.cuts = 0;
   knife.active = false; knife.group.visible = false;
   hidePreview();
+  markDirty();
 }
 function spawnFruit(key, opts = {}) {
   const f = FRUITS[key], k = fruitScale(key), tmpl = getTemplate(key, k);
@@ -1114,6 +1249,7 @@ function findSpot(radius) {
   for (let tries = 0; tries < 80; tries++) {
     const r = Math.sqrt(Math.random()) * Math.min(1.2 + tries * 0.08, WALL - radius - 0.6), a = Math.random() * Math.PI * 2;
     const x = Math.cos(a) * r, z = Math.sin(a) * r * 0.75;
+    if (glass.g.visible && Math.hypot(glass.home.x - x, glass.home.z - z) < glass.R + radius + 0.3) continue;
     if (pieces.every((p) => Math.hypot(p.body.position.x - x, p.body.position.z - z) > (p.radius + radius) * 1.05)) return new THREE.Vector2(x, z);
   }
   return null;
@@ -1181,7 +1317,7 @@ function tryCut(p, nW, dW, inRange, impulse, out) {
     if (np) { np.sv = -1.6 * (1.25 - state.firm); created.push(np); }
   }
   if (created.length < 2) { for (const c of created) removePiece(c); return false; }
-  const airborne = t.y > p.radius + 0.5;
+  const airborne = state.mode === 'arcade' ? p.body.velocity.y > 0 : t.y > p.radius + 0.5;
   removePiece(p);
   const at = new THREE.Vector3(); capW.forEach((w) => at.add(w)); at.multiplyScalar(1 / capW.length);
   out.push({ at, area: faceArea({ v: capR }), fruit: p.fruit, n: nW.clone(), airborne });
@@ -1244,7 +1380,7 @@ const particles = (() => {
       for (let i = list.length - 1; i >= 0; i--) {
         const q = list[i];
         q.life -= dt; q.v.y -= g * dt; q.p.addScaledVector(q.v, dt);
-        if (q.p.y < 0.03) { q.p.y = 0.03; q.v.set(0, 0, 0); q.life = Math.min(q.life, 0.25); }
+        if (state.mode !== 'arcade' && q.p.y < 0.03) { q.p.y = 0.03; q.v.set(0, 0, 0); q.life = Math.min(q.life, 0.25); }
         if (q.life <= 0) list.splice(i, 1);
       }
       for (const q of list) {
@@ -1257,6 +1393,7 @@ const particles = (() => {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     },
     clear() { list.length = 0; mesh.count = 0; },
+    alive() { return list.length; },
   };
 })();
 
@@ -1334,6 +1471,72 @@ const sfx = (() => {
       const t = ctx.currentTime + 0.005;
       tone(t, 0.1, 150, 60, 0.22 * k);
       nz(t, 0.08, 'lowpass', 500, 120, 1, 0.12 * k, 0.002);
+    },
+    boom() {
+      if (!ok('boom', 60)) return;
+      const t = ctx.currentTime + 0.005;
+      nz(t, 0.7, 'lowpass', 1800, 60, 0.8, 0.55, 0.004);
+      tone(t, 0.55, 110, 32, 0.45);
+      nz(t + 0.02, 0.25, 'bandpass', 900, 300, 1.5, 0.2, 0.002);
+    },
+    slurp() {
+      if (!ok('slurp', 90)) return;
+      const t = ctx.currentTime + 0.005;
+      nz(t, 0.28, 'bandpass', 350, 1300, 4, 0.22, 0.02);
+      for (let i = 0; i < 4; i++) tone(t + 0.06 + i * 0.05 + Math.random() * 0.03, 0.06, 500 + Math.random() * 500, 900 + Math.random() * 600, 0.07);
+    },
+    // one sip: juice running over the lip (bubbly, wet), then a swallow (click + low thump) and a little breath
+    sip() {
+      if (!ok('sip', 250)) return;
+      const t = ctx.currentTime + 0.01, flow = 0.32;
+      const src = ctx.createBufferSource(); src.buffer = noise;
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 4;
+      bp.frequency.setValueAtTime(520, t); bp.frequency.linearRampToValueAtTime(820, t + flow);
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2400;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t);
+      for (let k = 0, tt = t; tt < t + flow; k++, tt += 0.018 + Math.random() * 0.025) g.gain.linearRampToValueAtTime(0.06 + Math.random() * 0.2, tt); // bubbles
+      g.gain.exponentialRampToValueAtTime(0.0001, t + flow + 0.05);
+      src.connect(bp).connect(lp).connect(g).connect(out);
+      src.start(t, Math.random() * 0.6, flow + 0.1);
+      const s0 = t + flow + 0.03;
+      nz(s0, 0.018, 'bandpass', 2600, 2200, 3, 0.14, 0.001);
+      tone(s0 + 0.01, 0.17, 170, 55, 0.42);
+      nz(s0 + 0.01, 0.13, 'lowpass', 450, 120, 2, 0.22, 0.005);
+      nz(s0 + 0.2, 0.09, 'bandpass', 1400, 1100, 1.2, 0.035, 0.03);
+    },
+    sloshing() {},
+    // satisfied exhale: breath plus a voiced "aah" with a little vibrato
+    ahh() {
+      if (!ok('ahh', 300)) return;
+      const t = ctx.currentTime + 0.12, dur = 0.9;
+      const o = ctx.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(175, t); o.frequency.exponentialRampToValueAtTime(118, t + dur);
+      const vib = ctx.createOscillator(); vib.frequency.value = 5.5; const vibG = ctx.createGain(); vibG.gain.value = 3;
+      vib.connect(vibG).connect(o.frequency);
+      const voice = ctx.createGain();
+      voice.gain.setValueAtTime(0.0001, t); voice.gain.linearRampToValueAtTime(0.11, t + 0.1);
+      voice.gain.setValueAtTime(0.11, t + dur * 0.45); voice.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      for (const [f, q, a] of [[800, 5, 1], [1200, 7, 0.7], [2600, 9, 0.18]]) {
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q;
+        const ga = ctx.createGain(); ga.gain.value = a;
+        o.connect(bp).connect(ga).connect(voice);
+      }
+      voice.connect(out);
+      nz(t - 0.05, dur + 0.1, 'bandpass', 1600, 900, 0.9, 0.09, 0.08);
+      o.start(t); vib.start(t); o.stop(t + dur + 0.05); vib.stop(t + dur + 0.05);
+    },
+    // glass set back on the table
+    clink() {
+      if (!ok('clink', 200)) return;
+      const t = ctx.currentTime + 0.005;
+      tone(t, 0.35, 2900, 2860, 0.05);
+      tone(t, 0.25, 4300, 4250, 0.03);
+      tone(t, 0.08, 160, 80, 0.18);
+    },
+    fuse() {
+      if (!ok('fuse', 250)) return;
+      const t = ctx.currentTime + 0.005;
+      for (let i = 0; i < 6; i++) nz(t + i * 0.035 + Math.random() * 0.02, 0.02, 'highpass', 5000, 4000, 1, 0.05, 0.001);
     },
     ding(up = 1) {
       if (!ok('ding', 100)) return;
@@ -1534,9 +1737,10 @@ function swipeCut(a, b) {
   const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy), ux = dx / len, uy = dy / len;
   const focal = viewRect.height / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   const cpos = new THREE.Vector3();
+  const kn = activeKnife();
   const prefilter = (p) => {
     cpos.set(p.body.position.x, p.body.position.y, p.body.position.z);
-    const sr = p.radius * focal / Math.max(cpos.distanceTo(C), 0.1) + 8;
+    const sr = p.radius * focal / Math.max(cpos.distanceTo(C), 0.1) * kn.reach + 8;
     const s = projectToScreen(cpos);
     const t = THREE.MathUtils.clamp((s.x - a.x) * ux + (s.y - a.y) * uy, 0, len);
     return Math.hypot(a.x + ux * t - s.x, a.y + uy * t - s.y) < sr;
@@ -1544,17 +1748,20 @@ function swipeCut(a, b) {
   const inRange = (pts) => {
     let lo = Infinity, hi = -Infinity;
     for (const w of pts) { const s = projectToScreen(w); const t = (s.x - a.x) * ux + (s.y - a.y) * uy; lo = Math.min(lo, t); hi = Math.max(hi, t); }
-    return !(hi < -6 || lo > len + 6);
+    return !(hi < -6 * kn.reach - (kn.reach - 1) * 40 || lo > len + 6 * kn.reach + (kn.reach - 1) * 40);
   };
+  swipeBombs(a, b, ux, uy, len, focal);
   const hits = performCut(nW, dW, inRange, 2.2, prefilter);
   for (const h of hits) {
-    const pts = h.airborne ? 2 : 1;
+    const pts = ((h.airborne ? kn.air : 1) + kn.bonus) * kn.mult;
     state.arc.score += pts; state.arc.splits++;
     swipeHits++;
     const s = projectToScreen(h.at);
     popText(`+${pts}`, s.x, s.y, false);
+    const a = state.arc;
+    if (DIFFS[a.diff].bombs && a.hearts < MAX_HEARTS && Math.floor(a.score / HEAL_EVERY) > Math.floor((a.score - pts) / HEAL_EVERY)) { a.hearts++; popText('+1 heart', s.x, s.y - 50, true); sfx.ding(1.5); }
   }
-  if (hits.length) updateHud();
+  if (hits.length) { state.arc.idle = 0; updateHud(); }
 }
 function endSwipe() {
   if (swipeHits >= 3 && state.arc.running) {
@@ -1746,7 +1953,7 @@ function drawTrail() {
   ictx.save(); ictx.lineCap = 'round';
   for (let i = 1; i < trail.length; i++) {
     const a = trail[i - 1], b = trail[i], k = i / trail.length;
-    ictx.strokeStyle = `rgba(35,32,28,${0.15 + 0.7 * k})`;
+    ictx.strokeStyle = `rgba(${trailRGB},${0.15 + 0.7 * k})`;
     ictx.lineWidth = (1 + 8 * k) * d;
     ictx.beginPath(); ictx.moveTo((a.x - r.left) * d, (a.y - r.top) * d); ictx.lineTo((b.x - r.left) * d, (b.y - r.top) * d); ictx.stroke();
   }
@@ -1779,6 +1986,7 @@ const fmt = (v, d = 0) => v.toLocaleString('en-US', { minimumFractionDigits: d, 
 const fmtG = (g) => (g >= 1000 ? [fmt(g / 1000, 2), 'kg'] : [fmt(g, g < 10 ? 1 : 0), 'g']);
 function select(p) {
   deselect();
+  markDirty();
   state.selected = p;
   const o = new THREE.Mesh(p.mesh.geometry, outlineMat);
   o.scale.setScalar(1 + 0.035 / Math.max(p.radius, 0.2));
@@ -1802,6 +2010,7 @@ function select(p) {
   positionInfo();
 }
 function deselect() {
+  markDirty();
   const p = state.selected;
   if (p && p.outline) { p.mesh.remove(p.outline); p.outline = null; }
   state.selected = null;
@@ -1838,9 +2047,10 @@ const HINTS = {
 function updateTitle() {
   const t = $('title'), eb = $('eyebrow'), fact = $('fact');
   if (state.mode === 'arcade') {
-    eb.textContent = 'Fruit Lab · Arcade · 60 seconds';
+    const d = DIFFS[state.arc.diff] || DIFFS.normal;
+    eb.textContent = `Fruit Lab · Arcade · ${d.name}`;
     t.innerHTML = 'Fruit, <span>flying.</span>';
-    fact.textContent = 'Swipe through fruit while it is in the air. Sliced in mid-air scores double.';
+    fact.textContent = d.bombs ? 'Three hearts, no clock. Slice the fruit, never the bombs.' : 'Swipe through fruit as it flies. Caught on the way up scores double.';
     return;
   }
   const origins = new Map();
@@ -1897,8 +2107,398 @@ function buildFruitButtons() {
   }
 }
 
+/* ---------- juice glass (free cut, just for fun) ----------
+   Drop pieces into the glass with the hand. Juice yield per gram of fruit, mixed colour, a name and a taste. */
+const JUICE = {
+  orange: { ml: 0.45, sweet: 0.6, sour: 0.4 }, lemon: { ml: 0.35, sweet: 0.1, sour: 0.95 }, lime: { ml: 0.4, sweet: 0.1, sour: 0.9 },
+  grapefruit: { ml: 0.5, sweet: 0.35, sour: 0.6 }, kiwi: { ml: 0.5, sweet: 0.5, sour: 0.55 }, watermelon: { ml: 0.6, sweet: 0.85, sour: 0.05 },
+  avocado: { ml: 0.12, sweet: 0.1, sour: 0.05 }, apple: { ml: 0.35, sweet: 0.65, sour: 0.3 },
+};
+const glass = (() => {
+  const R = 1.15, H = 2.5, CAP = 300; // a tumbler: 86 mm wide, 94 mm tall, 300 ml
+  const g = new THREE.Group();
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false, envMapIntensity: 1.4 });
+  const wall = new THREE.Mesh(new THREE.CylinderGeometry(R, R * 0.88, H, 48, 1, true), glassMat); wall.position.y = H / 2; wall.renderOrder = 4;
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.88, R * 0.88, 0.2, 48), glassMat.clone()); base.material.opacity = 0.35; base.position.y = 0.1;
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.03, 8, 64), glassMat.clone()); rim.material.opacity = 0.6; rim.rotation.x = Math.PI / 2; rim.position.y = H;
+  // The liquid is a full-height column cut by a world-horizontal plane, so the surface stays level when the glass tips.
+  const clip = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
+  const innerH = H - 0.25;
+  const liquidGeo = new THREE.CylinderGeometry(R * 0.94, R * 0.85, innerH, 48, 1, false); liquidGeo.translate(0, 0.2 + innerH / 2, 0);
+  const liquidMat = new THREE.MeshStandardMaterial({ color: 0xf39a24, roughness: 0.2, transparent: true, opacity: 0.88, clippingPlanes: [clip], side: THREE.DoubleSide });
+  const liquid = new THREE.Mesh(liquidGeo, liquidMat); liquid.visible = false; liquid.renderOrder = 2;
+  const surfGeo = new THREE.CircleGeometry(1, 64); surfGeo.rotateX(-Math.PI / 2);
+  const foam = new THREE.Mesh(surfGeo, new THREE.MeshStandardMaterial({ color: 0xfff3da, roughness: 0.15, metalness: 0, transparent: true, opacity: 0.95, envMapIntensity: 1.2 }));
+  foam.visible = false; foam.renderOrder = 3;
+  scene.add(foam);
+  base.castShadow = wall.castShadow = false;
+  g.add(liquid, base, wall, rim);
+  g.position.set(1.2, 0, -3.0);
+  const home = g.position.clone();
+  g.visible = false;
+  scene.add(g);
+  return { g, R, H, CAP, home, liquid, liquidMat, foam, clip, ml: 0, level: 0, parts: {}, fullWarned: false, tag: null };
+})();
+/* Recipes: common ones have hints, rare and legendary ones are secrets you find by experimenting. */
+const CITRUS = ['orange', 'lemon', 'lime', 'grapefruit'];
+const only = (...fr) => (m) => m.kinds.length === fr.length && fr.every((f) => m.parts[f] > 0);
+const RECIPES = [
+  { id: 'orange', name: 'Fresh orange juice', tier: 'common', hint: 'Only oranges.', test: only('orange') },
+  { id: 'lemon', name: 'Lemonade, minus the sugar', tier: 'common', hint: 'Only lemons. Brave.', test: only('lemon') },
+  { id: 'lime', name: 'Lime shot', tier: 'common', hint: 'Only limes.', test: only('lime') },
+  { id: 'grapefruit', name: 'Fresh grapefruit juice', tier: 'common', hint: 'Only grapefruit.', test: only('grapefruit') },
+  { id: 'kiwi', name: 'Fresh kiwi juice', tier: 'common', hint: 'Only kiwi.', test: only('kiwi') },
+  { id: 'watermelon', name: 'Watermelon juice', tier: 'common', hint: 'Only watermelon.', test: only('watermelon') },
+  { id: 'apple', name: 'Apple juice', tier: 'common', hint: 'Only apples.', test: only('apple') },
+  { id: 'avocado', name: 'Avocado purée', tier: 'common', hint: 'Only avocado. Why not.', test: only('avocado') },
+  { id: 'citrus', name: 'Citrus blast', tier: 'common', hint: 'Two or three kinds of citrus.', test: (m) => m.kinds.length >= 2 && m.kinds.length <= 3 && m.kinds.every((k) => CITRUS.includes(k)) },
+  { id: 'orchard', name: 'Orchard press', tier: 'common', hint: 'Apple and lemon.', test: only('apple', 'lemon') },
+  { id: 'cooler', name: 'Kiwi-lime cooler', tier: 'common', hint: 'Kiwi and lime.', test: only('kiwi', 'lime') },
+  { id: 'punch', name: 'Summer punch', tier: 'common', hint: 'Watermelon with one or two other fruits.', test: (m) => m.parts.watermelon > 0 && m.kinds.length >= 2 && m.kinds.length <= 3 },
+  { id: 'green', name: 'Green smoothie', tier: 'common', hint: 'At least a third avocado, plus anything.', test: (m) => m.kinds.length >= 2 && m.share('avocado') >= 1 / 3 },
+  { id: 'tutti', name: 'Tutti frutti', tier: 'common', hint: 'Four or more kinds of fruit.', test: (m) => m.kinds.length >= 4 },
+  { id: 'house', name: 'House blend', tier: 'common', hint: 'Three kinds of fruit that fit no other recipe.', test: (m) => m.kinds.length === 3 },
+  { id: 'pair', name: 'Two-fruit mix', tier: 'common', hint: 'Any pair of fruits.', test: (m) => m.kinds.length === 2 },
+  { id: 'sunrise', name: 'Sunrise', tier: 'rare', hint: 'Orange and grapefruit, close to half and half.', test: (m) => only('orange', 'grapefruit')(m) && Math.abs(m.share('orange') - 0.5) <= 0.15 },
+  { id: 'ruby', name: 'Ruby splash', tier: 'rare', hint: 'Grapefruit and watermelon, nothing else.', test: only('grapefruit', 'watermelon') },
+  { id: 'guacade', name: 'Guac-ade', tier: 'rare', hint: 'Avocado and lime, nothing else.', test: only('avocado', 'lime') },
+  { id: 'sourface', name: 'Sour face', tier: 'rare', hint: 'Lemon and lime, a fifth or more of each.', test: (m) => only('lemon', 'lime')(m) && m.share('lemon') >= 0.2 && m.share('lime') >= 0.2 },
+  { id: 'seven', name: 'Lucky seven', tier: 'rare', hint: 'Exactly seven kinds of fruit.', test: (m) => m.kinds.length === 7 },
+  { id: 'bottoms', name: 'Bottoms up', tier: 'rare', bonus: true, hint: 'Drink a completely full glass.', test: (m) => m.total >= glass.CAP - 0.5 },
+  { id: 'sip', name: 'Just a sip', tier: 'rare', bonus: true, hint: 'Drink 55 ml or less.', test: (m) => m.total <= 55 },
+  { id: 'rainbow', name: 'Rainbow', tier: 'legendary', hint: 'All eight fruits in one glass.', test: (m) => m.kinds.length === 8 },
+  { id: 'half', name: 'Perfect half', tier: 'legendary', hint: 'Two fruits at exactly 50 : 50.', test: (m) => m.kinds.length === 2 && Math.abs(m.share(m.kinds[0]) - 0.5) <= 0.005 },
+  { id: 'golden', name: 'Golden ratio', tier: 'legendary', hint: 'Two fruits at 61.8 : 38.2.', test: (m) => m.kinds.length === 2 && Math.abs(m.share(m.kinds[0]) - 0.618) <= 0.006 },
+  { id: 'midnight', name: 'Midnight squeeze', tier: 'legendary', bonus: true, hint: 'Drink between midnight and one in the morning.', test: (m) => m.hour === 0 },
+];
+const TIER_ORDER = { legendary: 0, rare: 1, common: 2 };
+function currentMix() {
+  const total = glass.ml;
+  const kinds = Object.keys(glass.parts).filter((k) => glass.parts[k] > 0.01).sort((a, b) => glass.parts[b] - glass.parts[a]);
+  return { parts: glass.parts, total, kinds, share: (k) => (glass.parts[k] || 0) / Math.max(total, 1e-6), hour: new Date().getHours() };
+}
+function matchRecipes(m) {
+  if (!m.kinds.length) return [];
+  return RECIPES.filter((r) => r.test(m)).sort((a, b) => TIER_ORDER[a.tier] - TIER_ORDER[b.tier] || RECIPES.indexOf(a) - RECIPES.indexOf(b));
+}
+function recipeBook() {
+  let v = store.get('recipes2', null);
+  if (!v || typeof v !== 'object') {
+    v = {};
+    const old = store.get('recipes', {}) || {};
+    for (const [name, e] of Object.entries(old)) { const r = RECIPES.find((x) => x.name === name) || (name === 'Two-fruit mix' && RECIPES.find((x) => x.id === 'pair')); if (r) v[r.id] = e; }
+    store.set('recipes2', v);
+  }
+  return v;
+}
+function recipesHtml() {
+  const book = recipeBook();
+  const tiers = ['common', 'rare', 'legendary'];
+  const counts = tiers.map((t) => `${cap1(t)} ${RECIPES.filter((r) => r.tier === t && book[r.id]).length}/${RECIPES.filter((r) => r.tier === t).length}`).join(' · ');
+  const got = RECIPES.filter((r) => book[r.id]).map((r) => {
+    const e = book[r.id];
+    return `<div class="recipe got t-${r.tier}"><b>${esc(r.name)}</b><small>${r.tier === 'common' ? '' : `<em>${r.bonus ? 'Bonus · ' : ''}${cap1(r.tier)}</em> · `}${e.taste} · best ${fmt(e.ml)} ml</small></div>`;
+  }).join('');
+  const missing = RECIPES.filter((r) => !book[r.id]).map((r) => `<span class="rq t-${r.tier}" title="${r.tier === 'common' ? esc(r.hint) : `Secret ${r.tier} recipe`}">?</span>`).join('');
+  return `<p class="small">${counts}</p>${got ? `<div class="recipes">${got}</div>` : ''}${missing ? `<div class="rqs">${missing}</div>` : ''}`;
+}
+// A glass has one name from what is in it; bonus recipes (when and how much you drink) are listed separately.
+const mixMatches = (m) => matchRecipes(m).filter((r) => !r.bonus);
+const bonusMatches = (m) => matchRecipes(m).filter((r) => r.bonus);
+function juiceName() { const m = mixMatches(currentMix()); return m.length ? m[0].name : glass.ml > 0 ? 'Mystery mix' : 'Empty glass'; }
+function juiceTaste() {
+  let sweet = 0, sour = 0;
+  for (const [k, v] of Object.entries(glass.parts)) { const w = v / glass.ml; sweet += w * JUICE[k].sweet; sour += w * JUICE[k].sour; }
+  if ((glass.parts.avocado || 0) / glass.ml > 0.3) return 'creamy';
+  if (sour > 0.75) return 'very sour';
+  if (sour > 0.5 && sweet < 0.45) return 'tangy';
+  if (sweet > 0.65) return 'sweet';
+  return 'sweet and sour';
+}
+
+/* Drinking, first person: the glass comes up to your mouth and pivots around its lip.
+   It tips exactly as far as needed for the juice to reach the rim, so it tips further as the glass empties. */
+const fillHeight = (ml) => 0.2 + (ml / glass.CAP) * (glass.H - 0.45);
+function drinkTilt(ml) { return THREE.MathUtils.clamp(Math.atan2(glass.H - fillHeight(ml), glass.R * 0.95) + 0.1 + (ml < 40 ? (40 - ml) / 40 * 0.35 : 0), 0.45, 1.55); }
+function drinkPose(theta, d) {
+  const a = UP.clone().applyAxisAngle(d.axis, theta), lipDir = d.toCam.clone().applyAxisAngle(d.axis, theta);
+  return { pos: d.lip.clone().addScaledVector(a, -glass.H).addScaledVector(lipDir, -glass.R), q: new THREE.Quaternion().setFromAxisAngle(d.axis, theta) };
+}
+// the glass is held at the mouth: a fixed spot in front of the (moving) head
+function holdFrame(d) {
+  const C = camera.position, f = new THREE.Vector3(); camera.getWorldDirection(f);
+  const camUp = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+  const dist = 5.4, visH = 2 * dist * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  d.lip = C.clone().addScaledVector(f, dist).addScaledVector(camUp, -0.56 * visH);
+  d.toCam = C.clone().sub(d.lip); d.toCam.y = 0; d.toCam.normalize();
+  d.axis = new THREE.Vector3().crossVectors(UP, d.toCam).normalize();
+}
+// how far the head tips back: more as the glass tips further
+const headPitch = (theta) => 0.12 + 0.38 * THREE.MathUtils.clamp((theta - 0.35) / (1.42 - 0.35), 0, 1);
+const _xAxis = new THREE.Vector3(1, 0, 0), _hq = new THREE.Quaternion();
+function drinkGlass() {
+  if (glass.drink) return;
+  if (glass.ml < 50) { toast('Make at least 50 ml before you drink it.'); return; }
+  glass.drink = { recipes: matchRecipes(currentMix()), name: juiceName(), taste: juiceTaste(), ml: glass.ml, phase: 'lift', t: 0, sipT: 0 };
+  $('drinkBtn').disabled = $('emptyBtn').disabled = true;
+  updateGlassTag(); markDirty();
+}
+function finishDrink() {
+  const d = glass.drink; glass.drink = null;
+  const book = recipeBook(), fresh = [];
+  for (const r of d.recipes) {
+    if (!book[r.id]) fresh.push(r);
+    if (!book[r.id] || d.ml > book[r.id].ml) book[r.id] = { ml: d.ml, taste: d.taste, date: Date.now() };
+  }
+  store.set('recipes2', book);
+  glass.g.position.copy(glass.home); glass.g.quaternion.identity();
+  emptyGlass();
+  const found = Object.keys(book).length;
+  if (fresh.length) {
+    const best = [...fresh].sort((a, b) => TIER_ORDER[a.tier] - TIER_ORDER[b.tier])[0];
+    sfx.ding(best.tier === 'legendary' ? 1.6 : best.tier === 'rare' ? 1.45 : 1.3);
+    if (best.tier !== 'common') setTimeout(() => sfx.ding(best.tier === 'legendary' ? 2 : 1.7), 160);
+    const label = (r) => `${r.name}${r.tier === 'common' ? '' : ` (${r.tier})`}`;
+    const newDrinks = fresh.filter((r) => !r.bonus), newBonus = fresh.filter((r) => r.bonus);
+    const parts = [];
+    if (newDrinks.length) parts.push(`New drink${newDrinks.length > 1 ? 's' : ''}: ${newDrinks.map(label).join(', ')}.`);
+    if (newBonus.length) parts.push(`Bonus: ${newBonus.map(label).join(', ')}.`);
+    toast(`${parts.join(' ')} ${found} of ${RECIPES.length} in your recipe book.`);
+  } else toast(`Ahh. ${fmt(d.ml)} ml of ${d.name.toLowerCase()}, ${d.taste}.`);
+}
+function setGlass(on) {
+  if (glass.drink) return;
+  state.glassOn = on;
+  glass.g.visible = on && state.mode === 'free';
+  $('juiceBtn').textContent = on ? 'Put glass away' : 'Juice glass';
+  $('juiceBtn').setAttribute('aria-pressed', on);
+  $('emptyBtn').disabled = !on || glass.ml <= 0;
+  $('drinkBtn').disabled = !on || glass.ml < 50;
+  if (on && glass.ml === 0) toast('Carry pieces into the glass with the hand. Drink it to add the recipe to your book.');
+  state.autoZoom = true;
+  updateGlassTag(); markDirty();
+}
+function emptyGlass() {
+  glass.ml = 0; glass.parts = {}; glass.fullWarned = false; glass.drink = null;
+  updateGlassTag(); $('emptyBtn').disabled = $('drinkBtn').disabled = true; markDirty();
+}
+function updateGlassTag() {
+  if (!glass.g.visible || state.mode !== 'free' || glass.drink) { if (glass.tag) glass.tag.hidden = true; return; }
+  if (!glass.tag) { glass.tag = document.createElement('div'); glass.tag.className = 'tag juice'; $('labels').appendChild(glass.tag); }
+  const t = glass.tag; t.hidden = false;
+  if (glass.ml <= 0) t.innerHTML = '<b>Juice glass</b><span>Drop pieces in here</span>';
+  else {
+    const cm = currentMix(), drinks = mixMatches(cm), bonus = bonusMatches(cm), top = drinks[0];
+    const mix = Object.entries(glass.parts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${cap1(FRUITS[k].name)} ${fmt((v / glass.ml) * 100)} %`).join(' · ');
+    t.className = 'tag juice' + (top && top.tier !== 'common' ? ' t-' + top.tier : '');
+    const also = drinks.slice(1).map((r) => r.name).join(', ');
+    t.innerHTML = `<b>${juiceName()}</b><span>${fmt(glass.ml)} ml · ${juiceTaste()}</span><span>${mix}</span>`
+      + (also ? `<span class="also">Also counts as ${esc(also)}</span>` : '')
+      + bonus.map((r) => `<span class="bonus t-${r.tier}">+ ${esc(r.name)}</span>`).join('');
+  }
+  if (glass.ml > 0) {
+    const c = new THREE.Color(0, 0, 0), tmp = new THREE.Color();
+    for (const [k, v] of Object.entries(glass.parts)) c.add(tmp.set(FRUITS[k].juice).multiplyScalar(v / glass.ml));
+    glass.liquidMat.color.copy(c);
+    glass.foam.material.color.copy(c).lerp(new THREE.Color(0xfff6e4), 0.18);
+  }
+}
+function positionGlassTag() {
+  if (!glass.tag || glass.tag.hidden) return;
+  const s = projectToScreen(_b.set(glass.home.x, glass.H + 0.35, glass.home.z));
+  const minTop = (innerWidth <= 760 ? 70 : 84) + glass.tag.offsetHeight;
+  glass.tag.style.left = `${THREE.MathUtils.clamp(s.x - viewRect.left, 110, viewRect.width - 110)}px`; glass.tag.style.top = `${Math.max(s.y - viewRect.top, minTop)}px`;
+}
+const ease = (x) => x * x * (3 - 2 * x);
+function updateGlass(dt) {
+  $('drinkfx').classList.toggle('on', !!glass.drink && glass.drink.phase !== 'back');
+  document.body.classList.toggle('drinking', !!glass.drink);
+  if (!glass.g.visible || state.mode !== 'free') { glass.foam.visible = false; return false; }
+  const gx = glass.home.x, gz = glass.home.z;
+  const d = glass.drink;
+  if (d) {
+    d.t += dt;
+    const LIFT = 0.8, BACK = 0.75, CYCLE = 0.62;
+    // tip the head back (camera pitch) before placing the glass at the mouth
+    const t0 = drinkTilt(glass.ml);
+    const pitch = d.phase === 'lift' ? headPitch(t0) * ease(Math.min(1, d.t / LIFT))
+      : d.phase === 'sip' ? headPitch(d.theta ?? t0)
+      : headPitch(d.endTheta) * (1 - ease(Math.min(1, d.t / BACK)));
+    camera.quaternion.multiply(_hq.setFromAxisAngle(_xAxis, pitch));
+    camera.updateMatrixWorld();
+    holdFrame(d);
+    if (d.phase === 'lift') {
+      const k = ease(Math.min(1, d.t / LIFT)), pose = drinkPose(drinkTilt(glass.ml) * k, d);
+      glass.g.position.lerpVectors(glass.home, pose.pos, k);
+      glass.g.quaternion.identity().slerp(pose.q, k);
+      if (d.t >= LIFT) { d.phase = 'sip'; d.t = 0; d.sipT = CYCLE; }
+    } else if (d.phase === 'sip') {
+      // drink in sips: juice flows for part of each cycle, then you swallow
+      d.sipT += dt;
+      const inCycle = d.sipT % CYCLE;
+      if (Math.floor(d.sipT / CYCLE) !== Math.floor((d.sipT - dt) / CYCLE)) sfx.sip();
+      if (inCycle < CYCLE * 0.6) {
+        const before = glass.ml;
+        glass.ml = Math.max(0, glass.ml - dt * Math.max(90, d.ml / 2.2));
+        for (const k of Object.keys(glass.parts)) glass.parts[k] *= glass.ml / Math.max(before, 1e-6);
+      }
+      d.theta = THREE.MathUtils.lerp(d.theta ?? drinkTilt(glass.ml), drinkTilt(glass.ml), Math.min(1, dt * 6));
+      const pose = drinkPose(d.theta + Math.sin(d.sipT * 10) * 0.012, d);
+      glass.g.position.copy(pose.pos); glass.g.quaternion.copy(pose.q);
+      if (glass.ml <= 0.5) { glass.ml = 0; d.phase = 'back'; d.t = 0; d.endTheta = d.theta; sfx.ahh(); }
+    } else {
+      const k = ease(Math.min(1, d.t / BACK)), pose = drinkPose(d.endTheta, d);
+      glass.g.position.lerpVectors(pose.pos, glass.home, k);
+      glass.g.quaternion.copy(pose.q).slerp(new THREE.Quaternion(), k);
+      if (d.t >= BACK) { sfx.clink(); finishDrink(); }
+    }
+  }
+  for (const p of [...pieces]) {
+    if (glass.drink) break;
+    if (drag && drag.piece === p) continue;
+    const b = p.body;
+    if (Math.hypot(b.position.x - gx, b.position.z - gz) > glass.R * 0.85 || b.position.y > glass.H + p.radius * 0.5) continue;
+    if (glass.ml >= glass.CAP) {
+      if (!glass.fullWarned) { glass.fullWarned = true; toast('The glass is full. Drink it or pour it out.'); }
+      continue;
+    }
+    const grams = p.vol * CM ** 3 * FRUITS[p.fruit].density;
+    const ml = Math.min(grams * JUICE[p.fruit].ml, glass.CAP - glass.ml);
+    glass.ml += ml; glass.parts[p.fruit] = (glass.parts[p.fruit] || 0) + ml;
+    particles.burst(new THREE.Vector3(gx, glass.H * 0.8, gz), UP, FRUITS[p.fruit].juice, 18);
+    sfx.slurp();
+    removePiece(p);
+    updateStats(); updateTitle(); updateGlassTag();
+    $('emptyBtn').disabled = false;
+    $('drinkBtn').disabled = glass.ml < 50;
+    if (glass.ml >= glass.CAP) { sfx.ding(1.3); toast(`Cheers! A full glass of ${juiceName().toLowerCase()}.`); }
+  }
+  const target = fillHeight(glass.ml);
+  const moving = Math.abs(glass.level - target) > 0.002 || !!glass.drink;
+  glass.level = d ? target : glass.level + (target - glass.level) * Math.min(1, dt * 4);
+  // level surface: a horizontal plane through the glass axis at the fill height.
+  // In a tilted cylinder the volume below such a plane equals the upright volume at that axial height.
+  glass.g.updateMatrixWorld();
+  const axisW = UP.clone().applyQuaternion(glass.g.quaternion);
+  const centre = glass.g.position.clone().addScaledVector(axisW, glass.level);
+  const show = glass.ml > 0.5 && glass.level > 0.22;
+  glass.liquid.visible = glass.foam.visible = show;
+  glass.clip.constant = centre.y;
+  if (show) {
+    const cosT = Math.max(axisW.y, 0.2);
+    const rLocal = glass.R * (0.85 + 0.09 * (glass.level - 0.2) / (glass.H - 0.25)) * 0.99;
+    const shrink = THREE.MathUtils.clamp((glass.level - 0.2) / 0.35, 0.25, 1); // near the bottom the surface narrows to a sliver
+    const horiz = new THREE.Vector3(axisW.x, 0, axisW.z);
+    glass.foam.position.copy(centre).y += 0.002;
+    glass.foam.rotation.set(0, horiz.lengthSq() > 1e-6 ? -Math.atan2(horiz.z, horiz.x) : 0, 0);
+    glass.foam.scale.set((rLocal / cosT) * (cosT < 0.99 ? shrink : 1), 1, rLocal * (cosT < 0.99 ? shrink : 1));
+  }
+  return moving;
+}
+
+/* ---------- player profile, leaderboards and unlocks (saved in this browser) ---------- */
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const starsFor = (acc) => (acc >= 96 ? 3 : acc >= 90 ? 2 : acc >= 80 ? 1 : 0);
+function lbGet(key) { const v = store.get('lb.' + key, []); return Array.isArray(v) ? v : []; }
+function lbAdd(key, entry, field) {
+  const list = lbGet(key); list.push(entry);
+  list.sort((a, b) => b[field] - a[field]);
+  const top = list.slice(0, 10);
+  store.set('lb.' + key, top);
+  return top.indexOf(entry) + 1;
+}
+function bestCh(id) { const l = lbGet('ch.' + id); return l.length ? Math.max(...l.map((e) => e.acc)) : null; }
+function totalStars() { return CHALLENGES.reduce((s, c) => s + starsFor(bestCh(c.id) ?? 0), 0); }
+function bestArc(d) { const l = lbGet('arc.' + d); return l.length ? Math.max(...l.map((e) => e.score)) : 0; }
+// Knives unlock as you play. Each better knife keeps the perks of the ones below it.
+const KNIVES = {
+  steel: { name: 'Steel', blade: 0xdfe2e5, metal: 1, rough: 0.26, handle: 0x1f1c1a, trail: '35,32,28', css: '#cfd3d8', need: 'Starter knife', perk: 'No perk yet', air: 2, bonus: 0, mult: 1, reach: 1, unlocked: () => true },
+  copper: { name: 'Copper', blade: 0xd38b5d, metal: 1, rough: 0.3, handle: 0x3b2417, trail: '192,112,60', css: '#c9845a', need: '8 stars in Challenges', perk: 'Wider swipe', air: 2, bonus: 0, mult: 1, reach: 1.3, unlocked: () => totalStars() >= 8 },
+  obsidian: { name: 'Obsidian', blade: 0x34363c, metal: 0.85, rough: 0.18, handle: 0x0f0f10, trail: '20,20,24', css: '#3a3c42', need: '16 stars in Challenges', perk: 'Wider swipe, mid-air splits score 3', air: 3, bonus: 0, mult: 1, reach: 1.3, unlocked: () => totalStars() >= 16 },
+  gold: { name: 'Gold', blade: 0xe9c25a, metal: 1, rough: 0.22, handle: 0x23201c, trail: '205,150,30', css: '#e2b94e', need: '75 points in Arcade on Hard', perk: 'All of the above, +1 point on every split', air: 3, bonus: 1, mult: 1, reach: 1.4, unlocked: () => bestArc('hard') >= 75 },
+  diamond: { name: 'Diamond', blade: 0xbfeaff, metal: 0.35, rough: 0.04, handle: 0x1b2a3a, trail: '90,180,230', css: 'linear-gradient(90deg,#e8f8ff,#9fd8f5,#e8f8ff)', need: 'All 24 stars in Challenges', perk: 'Everything above, and double points', air: 3, bonus: 1, mult: 2, reach: 1.5, unlocked: () => totalStars() >= 24 },
+};
+const activeKnife = () => (KNIVES[profile.knife] && KNIVES[profile.knife].unlocked() ? KNIVES[profile.knife] : KNIVES.steel);
+let trailRGB = '35,32,28';
+const profile = Object.assign({ name: 'Player', avatar: 'orange', knife: 'steel' }, store.get('profile', {}));
+if (!FRUITS[profile.avatar]) profile.avatar = 'orange';
+if (!KNIVES[profile.knife]) profile.knife = 'steel';
+function unlockedKnives() { return Object.keys(KNIVES).filter((k) => KNIVES[k].unlocked()); }
+function applyKnifeSkin() {
+  const k = activeKnife();
+  const [steel, dark] = knife.mats;
+  steel.color.setHex(k.blade); steel.metalness = k.metal; steel.roughness = k.rough; dark.color.setHex(k.handle);
+  trailRGB = k.trail;
+}
+function renderProfileBtn() {
+  $('profileBtn').innerHTML = `<span class="av" style="background:${FRUITS[profile.avatar].sw}"></span><span class="pn">${esc(profile.name)}</span>`;
+  $('profileBtn').setAttribute('aria-label', `Your cook: ${profile.name}. Edit profile`);
+}
+function saveProfile() { store.set('profile', profile); renderProfileBtn(); applyKnifeSkin(); markDirty(); }
+function announceUnlocks(before) {
+  for (const k of unlockedKnives()) if (!before.includes(k)) setTimeout(() => toast(`New knife unlocked: ${KNIVES[k].name}. Pick it in your profile.`), 900);
+}
+function showProfile() {
+  const ks = Object.entries(KNIVES).map(([id, k]) => {
+    const ok = k.unlocked();
+    const status = ok ? (profile.knife === id ? 'In use' : 'Unlocked') : k.need;
+    return `<button class="knifeopt${ok ? '' : ' locked'}" data-k="${id}" aria-pressed="${profile.knife === id}" ${ok ? '' : 'aria-disabled="true"'}><span class="blade" style="background:${k.css}"></span><b>${k.name}</b><span class="perk">${k.perk}</span><span class="req">${ok ? '' : '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.5 5.5V4a2.5 2.5 0 0 1 5 0v1.5M2.5 5.5h7v5h-7z" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>'}${status}</span></button>`;
+  }).join('');
+  const avs = FRUIT_KEYS.map((k) => `<button class="fruit avopt" data-a="${k}" aria-pressed="${profile.avatar === k}" aria-label="${cap1(FRUITS[k].name)}"><span class="sw" style="--sw:${FRUITS[k].sw}"></span></button>`).join('');
+  showCard(`
+    <span class="label grade">Your cook</span>
+    <h2 class="display">Who is cutting?</h2>
+    <label class="field"><span class="label">Name on the leaderboards</span><input id="pName" maxlength="16" autocomplete="nickname" value="${esc(profile.name)}"></label>
+    <div class="group"><span class="label">Avatar</span><div class="avatars">${avs}</div></div>
+    <div class="group"><div class="row"><span class="label">Knife</span><span class="label">${unlockedKnives().length} / ${Object.keys(KNIVES).length} unlocked</span></div><div class="knives">${ks}</div></div>
+    <dl class="facts">
+      <div><dt class="label">Stars</dt><dd>${totalStars()} / ${CHALLENGES.length * 3}</dd></div>
+      <div><dt class="label">Arcade normal</dt><dd>${bestArc('normal')}</dd></div>
+      <div><dt class="label">Arcade hard</dt><dd>${bestArc('hard')}</dd></div>
+    </dl>
+    <div class="group"><div class="row"><span class="label">Drinks discovered</span><span class="label">${Object.keys(recipeBook()).length} / ${RECIPES.length}</span></div>${recipesHtml()}</div>
+    <div class="group cookbook">
+      <button id="cbOpen" class="cbbtn" aria-expanded="false"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 2.5h8.5a1.5 1.5 0 0 1 1.5 1.5v9.5H4.5A1.5 1.5 0 0 1 3 12V2.5Zm0 9.5a1.5 1.5 0 0 1 1.5-1.5H13M6 5.5h4"/></svg>Cookbook: how to make every drink</button>
+      <div class="cbwarn" id="cbWarn" hidden>
+        <p><b>Spoiler warning.</b> The cookbook lists every recipe, including the rare and legendary secrets. Finding them yourself is half the fun.</p>
+        <div class="btns"><button id="cbNo">Keep it secret</button><button class="primary" id="cbYes">Show all recipes</button></div>
+      </div>
+      <ol class="cblist" id="cbList" hidden>${RECIPES.map((r) => `<li class="t-${r.tier}"><b>${esc(r.name)}</b><span class="tier">${r.bonus ? 'Bonus · ' : ''}${cap1(r.tier)}</span><small>${esc(r.hint)}${recipeBook()[r.id] ? ' · <em>found</em>' : ''}</small></li>`).join('')}</ol>
+    </div>
+    <p class="small">Saved in this browser only. Another phone or computer starts fresh.</p>
+    <div class="btns"><button id="pCancel">Cancel</button><button class="primary" id="pSave">Save</button></div>`, 'wide');
+  const draft = { avatar: profile.avatar, knife: profile.knife };
+  $('cbOpen').onclick = () => {
+    const open = !$('cbList').hidden || !$('cbWarn').hidden;
+    $('cbWarn').hidden = open ? true : false; $('cbList').hidden = true;
+    $('cbOpen').setAttribute('aria-expanded', !open);
+  };
+  $('cbNo').onclick = () => { $('cbWarn').hidden = true; $('cbOpen').setAttribute('aria-expanded', false); };
+  $('cbYes').onclick = () => { $('cbWarn').hidden = true; $('cbList').hidden = false; $('cbList').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
+  $('card').querySelectorAll('.avopt').forEach((b) => (b.onclick = () => { draft.avatar = b.dataset.a; $('card').querySelectorAll('.avopt').forEach((x) => x.setAttribute('aria-pressed', x === b)); }));
+  $('card').querySelectorAll('.knifeopt').forEach((b) => (b.onclick = () => { if (b.classList.contains('locked')) { toast(`${KNIVES[b.dataset.k].name} unlocks with ${KNIVES[b.dataset.k].need.toLowerCase()}.`); return; } draft.knife = b.dataset.k; $('card').querySelectorAll('.knifeopt').forEach((x) => x.setAttribute('aria-pressed', x === b)); }));
+  $('pCancel').onclick = () => { hideCard(); if (state.mode === 'arcade' && !state.arc.running) arcadeIntro(); };
+  $('pSave').onclick = () => {
+    profile.name = ($('pName').value || '').trim().slice(0, 16) || 'Player';
+    profile.avatar = draft.avatar; profile.knife = draft.knife;
+    saveProfile(); hideCard(); toast(`Saved. Cutting as ${profile.name}.`);
+    if (state.mode === 'arcade' && !state.arc.running) arcadeIntro();
+  };
+}
+function lbHtml(list, kind) {
+  if (!list.length) return '<p class="empty">No scores yet in this browser. Be the first.</p>';
+  return '<ol class="lb">' + list.map((e, i) => `<li class="${e.name === profile.name ? 'me' : ''}"><span class="rk">${i + 1}</span><span class="av" style="background:${(FRUITS[e.avatar] || FRUITS.orange).sw}"></span><span class="nm">${esc(e.name)}</span><span class="sub">${kind === 'ch' ? cap1((FRUITS[e.fruit] || FRUITS.orange).name) : 'Level ' + (e.level || 1)}</span><span class="sc">${kind === 'ch' ? fmt(e.acc, 1) + ' %' : e.score}</span></li>`).join('') + '</ol>';
+}
+const starRow = (n) => `<span class="stars" aria-label="${n} of 3 stars">${[0, 1, 2].map((i) => `<i class="${i < n ? 'on' : ''}">★</i>`).join('')}</span>`;
+function wireScoreToggles() {
+  $('card').querySelectorAll('[data-lb]').forEach((b) => (b.onclick = () => {
+    const box = $('card').querySelector(`[data-lbbox="${b.dataset.lb}"]`);
+    box.hidden = !box.hidden; b.setAttribute('aria-expanded', !box.hidden); b.textContent = box.hidden ? 'Scores' : 'Hide';
+  }));
+}
+
 /* ---------- modes ---------- */
-function showCard(html) { $('card').innerHTML = html; $('overlay').hidden = false; }
+function showCard(html, cls = '') { $('card').className = 'card ' + cls; $('card').innerHTML = html; $('overlay').hidden = false; $('card').scrollTop = 0; }
 function hideCard() { $('overlay').hidden = true; }
 function setMode(m) {
   state.mode = m;
@@ -1915,25 +2515,51 @@ function setMode(m) {
   world.gravity.set(0, m === 'arcade' ? -G_ARCADE : -G_REAL, 0);
   canvas.classList.toggle('hand', state.tool === 'hand' && m !== 'arcade');
   state.autoZoom = true;
-  if (m === 'arcade') { orbit.az = 0; orbit.el = 0.42; orbit.r = orbit.rGoal = 14; orbit.ty = 1.7; fitShadow(7); clearTable(); updateTitle(); arcadeIntro(); }
+  if (m === 'arcade') { orbit.az = 0; orbit.el = 0.36; orbit.r = orbit.rGoal = 19; orbit.ty = 2.1; fitShadow(9); clearTable(); updateTitle(); arcadeIntro(); }
   else { orbit.el = 0.66; orbit.ty = 0.45; }
+  ground.visible = m !== 'arcade';
   if (m === 'free') resetTable();
-  if (m === 'challenge') startChallenge(state.ch.i);
+  glass.g.visible = !!state.glassOn && m === 'free';
+  updateGlassTag();
+  markDirty();
+  if (m === 'challenge') { startChallenge(state.ch.i); showLevels(); }
   resize();
 }
 
-/* challenges */
+/* challenges: pick any level, each with its own leaderboard */
+function showLevels() {
+  const rows = CHALLENGES.map((c, i) => {
+    const best = bestCh(c.id), st = starsFor(best ?? 0);
+    return `<div class="lvl${i === state.ch.i ? ' cur' : ''}">
+      <b class="num">${i + 1}</b>
+      <div class="meta"><strong>${c.name}</strong><small>${c.cuts} ${c.cuts === 1 ? 'cut' : 'cuts'} · ${c.shares.length} pieces</small></div>
+      ${starRow(st)}
+      <span class="best">${best === null ? '–' : fmt(best, 1) + ' %'}</span>
+      <div class="acts"><button data-lb="${i}" aria-expanded="false">Scores</button><button class="primary" data-play="${i}">Play</button></div>
+      <div class="lbbox" data-lbbox="${i}" hidden>${lbHtml(lbGet('ch.' + c.id), 'ch')}</div>
+    </div>`;
+  }).join('');
+  showCard(`
+    <div class="row"><span class="label grade">Challenges</span><span class="label">${totalStars()} / ${CHALLENGES.length * 3} stars</span></div>
+    <h2 class="display">Pick a level.</h2>
+    <p>Cut exact fractions with a limited number of cuts. 80 % accuracy earns a star, 90 % two, 96 % three. The fruit is the one picked in the panel: ${FRUITS[state.fruit].name}.</p>
+    <div class="levels">${rows}</div>
+    <div class="btns"><button id="lvClose">Close</button></div>`, 'wide');
+  $('card').querySelectorAll('[data-play]').forEach((b) => (b.onclick = () => startChallenge(+b.dataset.play)));
+  wireScoreToggles();
+  $('lvClose').onclick = hideCard;
+}
 function startChallenge(i) {
   hideCard(); deselect();
   state.sizes = false;
   state.ch = { i, used: 0, done: false };
   state.locked = false;
   const c = CHALLENGES[i];
-  $('gStep').textContent = `Challenge ${i + 1} of ${CHALLENGES.length}`;
+  $('gStep').textContent = `Level ${i + 1} of ${CHALLENGES.length}`;
   $('gName').textContent = c.name;
   $('gText').textContent = c.text;
-  const best = store.get('best.' + i, null);
-  $('gBest').textContent = best === null ? '' : `Best ${fmt(best, 1)} %`;
+  const best = bestCh(c.id);
+  $('gBest').innerHTML = best === null ? '' : `${starRow(starsFor(best))} ${fmt(best, 1)} %`;
   renderMeter();
   resetTable();
 }
@@ -1959,93 +2585,245 @@ function scoreChallenge() {
   for (let k = 0; k < n; k++) tvd += Math.abs((shares[k] || 0) - (target[k] || 0));
   const acc = Math.max(0, (1 - tvd / 2) * 100);
   const grade = GRADES.find(([min]) => acc >= min)[1];
-  const prev = store.get('best.' + state.ch.i, null);
-  const isBest = prev === null || acc > prev;
-  if (isBest) store.set('best.' + state.ch.i, acc);
+  const prev = bestCh(c.id);
+  const before = unlockedKnives();
+  const rank = lbAdd('ch.' + c.id, { name: profile.name, avatar: profile.avatar, acc, fruit: state.fruit, date: Date.now() }, 'acc');
+  announceUnlocks(before);
+  const st = starsFor(acc);
   state.sizes = true;
-  sfx.ding(acc >= 92 ? 1.25 : 1);
+  sfx.ding(st >= 2 ? 1.25 : 1);
+  if (st === 3) sfx.ding(1.5);
   const bars = shares.map((s, k) => `<div><span><b style="width:${Math.min(s, 1) * 100}%"></b><i style="left:${(target[k] || 0) * 100}%"></i></span>${fmt(s * 100, 1)} %</div>`).join('');
   const last = state.ch.i === CHALLENGES.length - 1;
   showCard(`
-    <span class="label grade">${c.name} · ${grade}${isBest ? ' · new best' : ''}</span>
+    <div class="row"><span class="label grade">Level ${state.ch.i + 1} · ${c.name} · ${grade}</span>${starRow(st)}</div>
     <div class="big">${fmt(acc, 1)} %</div>
-    <p>Accuracy against the target. ${shares.length === target.length ? `You made ${shares.length} pieces.` : `You made ${shares.length} pieces; the goal was ${target.length}.`} The black ticks mark the ideal size of each piece.</p>
+    <p>${prev === null || acc > prev ? 'New personal best. ' : `Your best is ${fmt(prev, 1)} %. `}${rank ? `#${rank} on this device. ` : ''}${shares.length === target.length ? `You made ${shares.length} pieces.` : `You made ${shares.length} pieces; the goal was ${target.length}.`} Black ticks mark the ideal size of each piece.</p>
     <div class="bars">${bars}</div>
-    <div class="btns"><button id="cRetry">Try again</button><button class="primary" id="cNext">${last ? 'Back to challenge 1' : 'Next challenge'}</button></div>`);
+    <div class="btns"><button id="cLevels">All levels</button><button id="cRetry">Try again</button><button class="primary" id="cNext">${last ? 'Level 1' : 'Next level'}</button></div>`);
+  $('cLevels').onclick = showLevels;
   $('cRetry').onclick = () => startChallenge(state.ch.i);
   $('cNext').onclick = () => startChallenge(last ? 0 : state.ch.i + 1);
 }
 
-/* arcade */
+/* arcade: three difficulties, waves that speed up, bombs and hearts on Hard */
+const DIFFS = {
+  easy: { name: 'Easy', desc: '60 seconds. Slower, fewer fruit.', timed: true, g: 20, base: 1.75, speed: 0.95, bombs: false },
+  normal: { name: 'Normal', desc: '60 seconds. A new, faster wave every 12 seconds.', timed: true, g: 26, base: 1.35, speed: 1, bombs: false },
+  hard: { name: 'Hard', desc: 'Only 3 hearts. Slicing a bomb costs one, and so does 7 seconds without a single split. Every 250 points wins a heart back.', timed: false, g: 26, base: 1.2, speed: 1.05, bombs: true },
+};
+const MAX_HEARTS = 3, HEAL_EVERY = 250, IDLE_LIMIT = 7;
+const HEART = (on) => `<svg viewBox="0 0 20 18" class="${on ? 'on' : ''}"><path d="M10 17s-8-4.7-8-10.2A4.6 4.6 0 0 1 10 4a4.6 4.6 0 0 1 8 2.8C18 12.3 10 17 10 17Z"/></svg>`;
 function arcadeIntro() {
-  const best = store.get('arcadeBest', 0);
+  const opts = Object.entries(DIFFS).map(([id, d]) => `<div class="diff">
+      <div class="meta"><strong>${d.name}</strong><small>${d.desc}</small></div>
+      <span class="best">${bestArc(id) ? 'Best ' + bestArc(id) : '–'}</span>
+      <div class="acts"><button data-lb="${id}" aria-expanded="false">Scores</button><button class="primary" data-start="${id}">Play</button></div>
+      <div class="lbbox" data-lbbox="${id}" hidden>${lbHtml(lbGet('arc.' + id), 'arc')}</div>
+    </div>`).join('');
   showCard(`
-    <span class="label grade">Arcade · 60 seconds</span>
+    <span class="label grade">Arcade</span>
     <h2 class="display">Slice it in the air.</h2>
-    <p>Fruit gets tossed up from the edge of the table. Swipe through it. Every split scores a point, two if the piece is still airborne. Slice three or more in one swipe for a combo bonus.</p>
-    ${best ? `<p>Your best: <b>${best}</b></p>` : ''}
-    <div class="btns"><button class="primary" id="aStart">Start</button></div>`);
-  $('aStart').onclick = startArcade;
+    <p>Fruit flies up from below and falls away again. Swipe through it: a split scores 1, or 2 if you catch the piece on its way up. Three or more in one swipe add a combo bonus.</p>
+    <p class="small">Your knife: <b>${activeKnife().name}</b> · ${activeKnife().perk}. Better knives unlock in your profile.</p>
+    <div class="levels">${opts}</div>`, 'wide');
+  $('card').querySelectorAll('[data-start]').forEach((b) => (b.onclick = () => startArcade(b.dataset.start)));
+  wireScoreToggles();
 }
-function startArcade() {
+function startArcade(diff = state.arc.diff || 'normal') {
   hideCard(); clearTable();
-  Object.assign(state.arc, { running: true, time: 60, score: 0, splits: 0, dropped: 0, spawnT: 0.4, bestCombo: 0 });
-  updateHud();
+  const d = DIFFS[diff];
+  world.gravity.set(0, -d.g, 0);
+  Object.assign(state.arc, { diff, running: true, time: 60, elapsed: 0, hearts: MAX_HEARTS, idle: 0, score: 0, splits: 0, dropped: 0, spawnT: 0.5, bestCombo: 0, level: 1, bombsHit: 0 });
+  $('hTimeBox').hidden = !d.timed;
+  $('hHeartsBox').hidden = d.timed;
+  updateHud(); updateTitle();
 }
 function updateHud() {
-  $('hScore').textContent = state.arc.score;
-  $('hTime').textContent = Math.ceil(state.arc.time);
-  $('hTimeBox').classList.toggle('low', state.arc.time <= 10);
+  const a = state.arc;
+  $('hScore').textContent = a.score;
+  $('hLevel').textContent = a.level;
+  $('hTime').textContent = Math.ceil(a.time);
+  $('hTimeBox').classList.toggle('low', a.time <= 10);
+  const h = Array.from({ length: MAX_HEARTS }, (_, i) => HEART(i < a.hearts)).join('');
+  if ($('hHearts').dataset.h !== String(a.hearts)) { $('hHearts').innerHTML = h; $('hHearts').dataset.h = a.hearts; }
+  const left = Math.max(0, 1 - (a.idle || 0) / IDLE_LIMIT);
+  $('hIdle').style.width = `${left * 100}%`;
+  $('hIdle').classList.toggle('warn', left < 0.35);
+}
+// lowest visible height at depth z: things below it are off-screen
+const _vbRay = new THREE.Raycaster();
+function viewBottomY(z) {
+  _vbRay.setFromCamera(new THREE.Vector2(0, -1.08), camera);
+  const o = _vbRay.ray.origin, d = _vbRay.ray.direction;
+  if (Math.abs(d.z) < 1e-4) return -6;
+  const t = (z - o.z) / d.z;
+  return Math.min(-1.5, o.y + d.y * t);
 }
 function tossFruit() {
   if (state.mode !== 'arcade' || !state.arc.running) return;
+  const d = DIFFS[state.arc.diff], g = -world.gravity.y;
   const key = FRUIT_KEYS[Math.floor(Math.random() * FRUIT_KEYS.length)];
   const side = Math.random() < 0.5 ? -1 : 1;
-  const x = side * (2.5 + Math.random() * 2.5), z = 0.4 + Math.random() * 1.4;
-  const pos = new THREE.Vector3(x, 1.4, z);
-  const vy = Math.sqrt(2 * G_ARCADE * (3 + Math.random() * 1.3));
-  const vel = new THREE.Vector3(-side * (1.2 + Math.random() * 2.2), vy, -(0.3 + Math.random() * 0.8));
+  // fly in from below the bottom edge of the view and arc across it
+  const z0 = 0.2 + Math.random() * 1.2, y0 = viewBottomY(z0) - 1.5;
+  const x0 = side * (1 + Math.random() * 4.5), xEnd = -side * Math.random() * 4;
+  const vy = Math.sqrt(2 * g * (2.2 + Math.random() * 2.4 - y0)) * Math.sqrt(d.speed);
+  const pos = new THREE.Vector3(x0, y0, z0);
+  const vel = new THREE.Vector3((xEnd - x0) / (2 * vy / g), vy, -(0.1 + Math.random() * 0.3));
   const ang = new THREE.Vector3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6);
   spawnFruit(key, { pos, vel, ang });
 }
 function updateArcade(dt) {
   const a = state.arc;
   for (const p of [...pieces]) {
-    const age = now() - p.born;
-    if (!p.dying && ((p.landed && age > 2.5) || pieces.length > 45 || p.body.position.y < -3)) p.dying = true;
-    if (p.dying) { p.fade -= dt * 3; if (p.fade <= 0) removePiece(p); }
+    const b = p.body;
+    if ((b.velocity.y < 0 && b.position.y < viewBottomY(b.position.z) - 2) || pieces.length > 60) {
+      if (p.whole && a.running) a.dropped++;
+      removePiece(p);
+    }
   }
+  updateBombs(dt);
   if (!a.running) return;
-  a.time -= dt;
+  const d = DIFFS[a.diff];
+  a.elapsed += dt;
+  if (d.timed) a.time -= dt;
+  if (d.bombs) {
+    a.idle += dt;
+    if (a.idle >= IDLE_LIMIT) {
+      a.idle = 0; a.hearts = Math.max(0, a.hearts - 1);
+      popText('Too slow! −1 heart', viewRect.left + viewRect.width / 2, viewRect.top + viewRect.height * 0.4, true);
+      sfx.thud(1); const fl = $('flash'); fl.classList.remove('on'); void fl.offsetWidth; fl.classList.add('on');
+    }
+  }
+  const lvl = Math.min(d.timed ? 1 + Math.floor(a.elapsed / 12) : 1 + Math.floor(a.score / 15), 10);
+  if (lvl > a.level) { a.level = lvl; popText(`Level ${lvl}`, viewRect.left + viewRect.width / 2, viewRect.top + viewRect.height * 0.38, true); sfx.ding(1.15 + lvl * 0.04); }
   a.spawnT -= dt;
   if (a.spawnT <= 0) {
-    const n = 1 + (Math.random() < 0.4) + (Math.random() < 0.15) + (a.time < 25 && Math.random() < 0.3);
+    const n = 1 + (Math.random() < 0.22 + a.level * 0.06) + (Math.random() < 0.05 + a.level * 0.04);
     for (let i = 0; i < n; i++) setTimeout(tossFruit, i * 140);
-    a.spawnT = Math.max(0.7, 1.5 - (60 - a.time) * 0.012) + Math.random() * 0.4;
+    a.spawnT = Math.max(0.5, d.base - (a.level - 1) * 0.1) + Math.random() * 0.35;
+    // bombs come between waves, from the middle, so they are easy to tell apart from the fruit
+    if (d.bombs && Math.random() < Math.min(0.1 + a.level * 0.025, 0.3)) setTimeout(tossBomb, a.spawnT * 500);
   }
-  if (a.time <= 0) { a.time = 0; a.running = false; arcadeEnd(); }
+  if ((d.timed && a.time <= 0) || (!d.timed && a.hearts <= 0)) { a.time = Math.max(0, a.time); a.running = false; arcadeEnd(); }
   updateHud();
 }
 function arcadeEnd() {
-  const a = state.arc, prev = store.get('arcadeBest', 0), isBest = a.score > prev;
-  if (isBest) store.set('arcadeBest', a.score);
+  const a = state.arc, d = DIFFS[a.diff];
+  const prev = bestArc(a.diff), before = unlockedKnives();
+  const rank = a.score > 0 ? lbAdd('arc.' + a.diff, { name: profile.name, avatar: profile.avatar, score: a.score, level: a.level, date: Date.now() }, 'score') : 0;
+  announceUnlocks(before);
   sfx.ding(1.3);
   showCard(`
-    <span class="label grade">Time · ${isBest ? 'new best' : `best ${prev}`}</span>
+    <span class="label grade">${d.name} · ${d.timed ? 'time' : 'out of hearts'} · ${a.score > prev ? 'new best' : `best ${prev}`}</span>
     <div class="big">${a.score}</div>
+    <p>${rank ? `#${rank} on this device. ` : ''}You reached level ${a.level}.</p>
     <dl class="facts">
       <div><dt class="label">Splits</dt><dd>${a.splits}</dd></div>
       <div><dt class="label">Best combo</dt><dd>${a.bestCombo ? '×' + a.bestCombo : '–'}</dd></div>
-      <div><dt class="label">Dropped whole</dt><dd>${a.dropped}</dd></div>
+      <div><dt class="label">${d.bombs ? 'Bombs hit' : 'Missed fruit'}</dt><dd>${d.bombs ? a.bombsHit : a.dropped}</dd></div>
     </dl>
-    <div class="btns"><button id="aFree">Back to free cut</button><button class="primary" id="aAgain">Play again</button></div>`);
-  $('aAgain').onclick = startArcade;
-  $('aFree').onclick = () => setMode('free');
+    <div class="btns"><button id="aDiff">Change difficulty</button><button class="primary" id="aAgain">Play again</button></div>`);
+  $('aAgain').onclick = () => startArcade(a.diff);
+  $('aDiff').onclick = arcadeIntro;
+}
+
+/* bombs (Hard): tossed with the fruit, cost a heart when sliced */
+const bombs = [];
+const bombParts = {
+  shell: new THREE.SphereGeometry(0.5, 24, 16),
+  cap: new THREE.CylinderGeometry(0.14, 0.17, 0.16, 14),
+  fuse: new THREE.CylinderGeometry(0.03, 0.03, 0.32, 6),
+  spark: new THREE.SphereGeometry(0.08, 8, 6),
+  shellMat: new THREE.MeshStandardMaterial({ color: 0x1c1d22, metalness: 0.45, roughness: 0.32 }),
+  fuseMat: new THREE.MeshStandardMaterial({ color: 0x9a7a48, roughness: 0.85 }),
+  sparkMat: new THREE.MeshBasicMaterial({ color: 0xffb030, toneMapped: false }),
+};
+function tossBomb() {
+  if (state.mode !== 'arcade' || !state.arc.running) return;
+  const g = new THREE.Group();
+  const shell = new THREE.Mesh(bombParts.shell, bombParts.shellMat); shell.castShadow = true; g.add(shell);
+  const capM = new THREE.Mesh(bombParts.cap, bombParts.shellMat); capM.position.y = 0.5; g.add(capM);
+  const fuse = new THREE.Mesh(bombParts.fuse, bombParts.fuseMat); fuse.position.set(0.06, 0.68, 0); fuse.rotation.z = -0.4; g.add(fuse);
+  const spark = new THREE.Mesh(bombParts.spark, bombParts.sparkMat); spark.position.set(0.13, 0.84, 0); g.add(spark);
+  scene.add(g);
+  const gv = -world.gravity.y, side = Math.random() < 0.5 ? -1 : 1;
+  const body = new CANNON.Body({ mass: 2, material: fruitMat, collisionFilterGroup: G_PIECE, collisionFilterMask: 0, linearDamping: 0.05, angularDamping: 0.3 });
+  body.addShape(new CANNON.Sphere(0.5));
+  const z0 = 0.5 + Math.random() * 0.8, y0 = viewBottomY(z0) - 1.2;
+  body.position.set(side * Math.random() * 1.5, y0, z0);
+  body.velocity.set(side * (0.2 + Math.random() * 0.8), Math.sqrt(2 * gv * (2.6 + Math.random() * 1.4 - y0)), -(0.1 + Math.random() * 0.2));
+  body.angularVelocity.set((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4);
+  world.addBody(body);
+  const bomb = { g, body, spark, born: now(), landed: false, fade: 1 };
+  body.addEventListener('collide', (e) => { if (e.body === groundBody) bomb.landed = true; });
+  bombs.push(bomb);
+  sfx.fuse();
+}
+function removeBomb(b) { scene.remove(b.g); world.removeBody(b.body); const i = bombs.indexOf(b); if (i >= 0) bombs.splice(i, 1); }
+function updateBombs(dt) {
+  for (const b of [...bombs]) {
+    b.g.position.set(b.body.position.x, b.body.position.y, b.body.position.z);
+    b.g.quaternion.set(b.body.quaternion.x, b.body.quaternion.y, b.body.quaternion.z, b.body.quaternion.w);
+    b.spark.scale.setScalar(0.7 + Math.random() * 0.8);
+    if (b.body.velocity.y < 0 && b.body.position.y < viewBottomY(b.body.position.z) - 2) removeBomb(b);
+  }
+}
+function explodeBomb(b) {
+  const at = new THREE.Vector3(b.body.position.x, b.body.position.y, b.body.position.z);
+  removeBomb(b);
+  particles.burst(at, UP, '#2b2b30', 26);
+  particles.burst(at, UP, '#ffaa30', 22);
+  sfx.boom();
+  const app = $('app'); app.classList.remove('shake'); void app.offsetWidth; app.classList.add('shake');
+  const fl = $('flash'); fl.classList.remove('on'); void fl.offsetWidth; fl.classList.add('on');
+  const a = state.arc;
+  a.hearts = Math.max(0, a.hearts - 1); a.bombsHit++;
+  const s = projectToScreen(at);
+  popText('−1 heart', s.x, s.y, true);
+  updateHud();
+}
+function swipeBombs(a, b, ux, uy, len, focal) {
+  const C = camera.position, cpos = new THREE.Vector3();
+  for (const bm of [...bombs]) {
+    if (bm.fade < 1) continue;
+    cpos.set(bm.body.position.x, bm.body.position.y, bm.body.position.z);
+    const sr = 0.5 * focal / Math.max(cpos.distanceTo(C), 0.1);
+    const s = projectToScreen(cpos);
+    const t = THREE.MathUtils.clamp((s.x - a.x) * ux + (s.y - a.y) * uy, 0, len);
+    if (Math.hypot(a.x + ux * t - s.x, a.y + uy * t - s.y) < sr * 0.6) explodeBomb(bm);
+  }
 }
 
 /* ---------- controls ---------- */
 buildFruitButtons();
-document.querySelectorAll('.modes button').forEach((b) => (b.onclick = () => setMode(b.dataset.mode)));
+document.querySelectorAll('.modes button').forEach((b) => (b.onclick = () => {
+  if (b.dataset.mode === state.mode && state.mode === 'challenge') showLevels();
+  else if (b.dataset.mode === state.mode && state.mode === 'arcade' && !state.arc.running) arcadeIntro();
+  else setMode(b.dataset.mode);
+}));
+$('profileBtn').onclick = showProfile;
+$('juiceBtn').onclick = () => setGlass(!state.glassOn);
+$('emptyBtn').onclick = emptyGlass;
+$('drinkBtn').onclick = drinkGlass;
+const FS_ON = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5V3h4.5M12.5 3H17v4.5M17 12.5V17h-4.5M7.5 17H3v-4.5"/></svg>';
+const FS_OFF = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 3v4.5H3M17 7.5h-4.5V3M12.5 17v-4.5H17M3 12.5h4.5V17"/></svg>';
+function renderFs() {
+  const on = !!document.fullscreenElement;
+  $('fsBtn').innerHTML = on ? FS_OFF : FS_ON;
+  $('fsBtn').setAttribute('aria-label', on ? 'Leave full screen' : 'Full screen');
+}
+if (!document.fullscreenEnabled) $('fsBtn').hidden = true;
+$('fsBtn').onclick = () => {
+  const req = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+  Promise.resolve(req).catch(() => toast('Full screen is not available here. Try the published GitHub page.'));
+};
+document.addEventListener('fullscreenchange', () => { renderFs(); setTimeout(resize, 60); });
+renderFs();
+$('gLevels').onclick = showLevels;
+renderProfileBtn();
+applyKnifeSkin();
 $('toolHand').onclick = () => setTool('hand');
 $('toolKnife').onclick = () => setTool('knife');
 $('firm').oninput = (e) => { state.firm = +e.target.value; $('firmOut').textContent = fmt(state.firm, 2); applySoftness(); };
@@ -2079,7 +2857,7 @@ $('reset').onclick = () => {
   clearTable(); state.autoZoom = true; updateStats(); updateTitle();
 };
 addEventListener('keydown', (e) => {
-  if (e.target.tagName === 'INPUT' && e.target.type === 'range') return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (e.key === 'Escape') { deselect(); return; }
   if (e.key === 'm' || e.key === 'M') { $('soundBtn').click(); return; }
   if (state.mode === 'arcade') return;
@@ -2100,6 +2878,7 @@ function resize() {
   camera.updateProjectionMatrix();
   viewRect = canvas.getBoundingClientRect();
   updateCamera();
+  markDirty();
 }
 addEventListener('resize', resize);
 
@@ -2115,6 +2894,7 @@ function syncMeshes(dt) {
       const steps = 3, h = dt / steps;
       for (let i = 0; i < steps; i++) { p.sv += (-k * p.s - c * p.sv) * h; p.s += p.sv * h; }
       p.s = THREE.MathUtils.clamp(p.s, -0.28, 0.28);
+      if (Math.abs(p.s) < 0.0008 && Math.abs(p.sv) < 0.01) { p.s = 0; p.sv = 0; }
     }
     const s = p.s, fd = Math.max(p.fade, 0.001);
     _q.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
@@ -2131,11 +2911,15 @@ function autoFrame(dt) {
   if (state.mode !== 'arcade' && state.autoZoom && pieces.length) {
     let ext = 1, top = 0;
     for (const p of pieces) { ext = Math.max(ext, Math.hypot(p.body.position.x, p.body.position.z) + p.radius); top = Math.max(top, p.body.position.y + p.radius); }
+    if (glass.g.visible && state.mode === 'free') { ext = Math.max(ext, Math.hypot(glass.home.x, glass.home.z) + glass.R + 0.6); top = Math.max(top, glass.H + 0.4); }
     orbit.rGoal = THREE.MathUtils.clamp(6 + ext * 3.1 + top * 1.1, 9, 40);
-    orbit.ty = THREE.MathUtils.lerp(orbit.ty, THREE.MathUtils.clamp(top * 0.3, 0.45, 2), 1 - Math.exp(-dt * 3));
+    const ty = THREE.MathUtils.clamp(top * 0.3, 0.45, 2);
+    orbit.ty = Math.abs(orbit.ty - ty) < 0.003 ? ty : THREE.MathUtils.lerp(orbit.ty, ty, 1 - Math.exp(-dt * 3));
+    orbit.rGoal = Math.round(orbit.rGoal * 20) / 20;
     fitShadow(ext);
   }
   if (Math.abs(orbit.r - orbit.rGoal) > 0.01) orbit.r = THREE.MathUtils.lerp(orbit.r, orbit.rGoal, 1 - Math.exp(-dt * 4));
+  else orbit.r = orbit.rGoal;
   updateCamera();
 }
 // adaptive resolution: keep the frame rate up on slower machines
@@ -2148,6 +2932,17 @@ function adaptQuality(ms) {
   if (avg > 26 && dpr > 0.75) { dpr = Math.max(0.75, dpr - 0.25); perf.good = 0; resize(); }
   else if (avg < 15 && dpr < DPR_MAX) { if (++perf.good >= 4) { dpr = Math.min(DPR_MAX, dpr + 0.25); perf.good = 0; resize(); } }
   else perf.good = 0;
+}
+// Render only when something can change on screen; an idle table costs almost nothing.
+let dirty = 3;
+function markDirty() { dirty = Math.max(dirty, 2); }
+const _lastCam = new THREE.Matrix4();
+function sceneActive() {
+  if (state.mode === 'arcade' || drag || knife.active || particles.alive() || bombs.length) return true;
+  for (const s of stains) if (s.t < 1) return true;
+  for (const p of pieces) if (p.body.sleepState !== CANNON.Body.SLEEPING || Math.abs(p.s) > 0.001 || p.fade < 1) return true;
+  if (!_lastCam.equals(camera.matrixWorld)) { _lastCam.copy(camera.matrixWorld); return true; }
+  return false;
 }
 let last = performance.now();
 function frame(t) {
@@ -2164,10 +2959,15 @@ function frame(t) {
     particles.update(dt);
     for (const s of stains) if (s.t < 1) { s.t = Math.min(1, s.t + dt / 0.9); s.mesh.scale.setScalar(s.size * (1 - Math.pow(1 - s.t, 3))); }
     autoFrame(dt);
-    renderer.render(scene, camera);
-    updateTags();
-    positionInfo();
-    adaptQuality(raw);
+    const glassMoving = updateGlass(dt);
+    if (sceneActive() || glassMoving || dirty > 0) {
+      if (dirty > 0) dirty--;
+      renderer.render(scene, camera);
+      updateTags();
+      positionInfo();
+      positionGlassTag();
+      adaptQuality(raw);
+    }
   } catch (err) {
     console.error(err);
     for (const p of [...pieces]) if (!isFinite(p.body.position.x)) removePiece(p);
@@ -2185,7 +2985,9 @@ requestAnimationFrame(frame);
 window.fruitLab = {
   cut: (ax, az, bx, bz) => { const h = lineHeight(); return releaseKnife(new THREE.Vector3(ax, h, az), new THREE.Vector3(bx, h, bz)); },
   preview: (ax, az, bx, bz) => { const h = lineHeight(); updatePreview(new THREE.Vector3(ax, h, az), new THREE.Vector3(bx, h, bz), true); },
-  setMode, addFruit, pieces, state, orbit, camera, world,
+  sceneActive: () => ({ drag: !!drag, knife: knife.active, parts: particles.alive(), bombs: bombs.length, stains: stains.filter((s) => s.t < 1).length, awake: pieces.filter((p) => p.body.sleepState !== CANNON.Body.SLEEPING).length, jig: pieces.filter((p) => p.s !== 0).length, fade: pieces.filter((p) => p.fade < 1).length, dirty }),
+  glassApi: () => ({ ml: glass.ml, drink: !!glass.drink, name: juiceName(), book: recipeBook() }),
+  setMode, addFruit, pieces, state, orbit, camera, world, startArcade, startChallenge, tossBomb, bombs, explodeBomb, glass, renderer,
   timing: () => { const t0 = performance.now(); world.step(1 / 120); const t1 = performance.now(); renderer.render(scene, camera); return { physicsMs: t1 - t0, pieces: pieces.length, dpr }; },
 };
 </script>
